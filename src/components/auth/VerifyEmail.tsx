@@ -8,7 +8,7 @@ export default function VerifyEmail() {
     <div className="flex flex-col items-center">
       <Link href="/" className="flex items-center mb-8">
         <Clock className="h-8 w-8 mr-2 text-purple-400" />
-        <span className="text-2xl font-bold text-white">FocusTimer</span>
+        <span className="text-2xl font-bold text-white">ConcentrAPPte</span>
       </Link>
       
       <Card className="w-full max-w-md bg-[#1a1a2e] border-gray-800">
