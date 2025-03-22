@@ -1037,7 +1037,7 @@ export default function LandingPage() {
                 ¿Quiénes pueden usar nuestra APP?
               </h2>
               <p className="max-w-[700px] text-gray-400">
-                Únate a miles de personas enfocadas en el éxito que utilizan nuestra herramienta para aumentar su productividad.
+                Únete a miles de personas enfocadas en el éxito que utilizan nuestra herramienta para aumentar su productividad.
               </p>
             </div>
 
