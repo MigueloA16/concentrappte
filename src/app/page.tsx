@@ -265,7 +265,7 @@ export default function LandingPage() {
                           <div className="h-8 w-8 bg-green-500 rounded-full flex items-center justify-center text-xs font-bold">MT</div>
                           <div className="h-8 w-8 bg-gray-700 rounded-full flex items-center justify-center text-xs font-bold text-gray-400">+5</div>
                         </div>
-                        <Button className="w-full mt-4 bg-purple-600 hover:bg-purple-700">Join Room</Button>
+                        <Button className="w-full mt-4 bg-purple-600 hover:bg-purple-700">Ingresar al grupo</Button>
                       </div>
 
                       <div className="bg-[#131325] rounded-lg p-4">
