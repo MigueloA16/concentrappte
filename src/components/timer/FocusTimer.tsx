@@ -12,7 +12,8 @@ import {
   StopCircle, 
   CheckCircle2, 
   XCircle,
-  Coffee
+  Coffee,
+  RotateCcw
 } from "lucide-react";
 import { 
   Dialog,
@@ -538,7 +539,7 @@ const startTimer = async () => {
           <CardDescription className="text-gray-400">
             {isBreak
               ? `Toma un descanso y vuelve en ${defaultBreakLength} minutos`
-              : "Comienza tu sesión de enfoque para aumentar tu productividad"
+              : `${currentTask?.name ? 'Tarea' + currentTask?.name : 'Comienza tu sesión de enfoque para aumentar tu productividad'}`
             }
           </CardDescription>
         </CardHeader>
@@ -647,13 +648,14 @@ const startTimer = async () => {
             {showBreakPrompt && (
               <div className="space-y-4 bg-[#262638] p-4 rounded-lg border border-gray-700">
                 <div className="text-center">
-                  <h3 className="text-lg font-medium text-white mb-2">¡Sesión completada!</h3>
-                  <p className="text-gray-300 text-sm">Tu sesión de enfoque ha terminado. ¿Qué te gustaría hacer?</p>
+                  <h3 className="text-base text-white mb-2">¡Sesión completada!</h3>
+                  <p className="text-gray-300 text-xs">Tu sesión de enfoque ha terminado. ¿Qué te gustaría hacer?</p>
                 </div>
                 <div className="flex flex-col space-y-2">
                   <Button
                     onClick={startBreak}
-                    className="bg-green-600 hover:bg-green-700"
+                    size="sm"
+                    className="bg-purple-600 hover:bg-purple-700 text-xs"
                   >
                     <Coffee className="h-4 w-4 mr-2" />
                     Comenzar Descanso
@@ -661,9 +663,10 @@ const startTimer = async () => {
                   <Button
                     variant="outline"
                     onClick={skipBreak}
-                    className="border-gray-600"
+                    size="sm"
+                    className="border-gray-600 text-xs"
                   >
-                    <SkipForward className="h-4 w-4 mr-2" />
+                    <RotateCcw className="h-4 w-4 mr-2" />
                     Omitir Descanso
                   </Button>
                 </div>
@@ -696,7 +699,7 @@ const startTimer = async () => {
                   onClick={resetTimer}
                   className="border-gray-700 text-gray-400 hover:bg-gray-800 hover:text-white"
                 >
-                  <SkipForward className="h-4 w-4" />
+                  <RotateCcw className="h-4 w-4" />
                   <span className="sr-only">Reiniciar</span>
                 </Button>
               </div>
@@ -735,7 +738,7 @@ const startTimer = async () => {
             <div className="flex space-x-2 mt-4">
               <Button 
                 onClick={() => handleTaskComplete(true)}
-                className="flex-1 bg-green-600 hover:bg-green-700"
+                className="flex-1 bg-purple-600 hover:bg-purple-700"
               >
                 <CheckCircle2 className="h-4 w-4 mr-2" />
                 Sí, completada
