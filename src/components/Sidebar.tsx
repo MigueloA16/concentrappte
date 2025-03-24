@@ -18,18 +18,18 @@ const navItems = [
     icon: BarChart,
   },
   {
-    label: "Timer",
-    href: "/dashboard/timer",
+    label: "Sesión de Enfoque",
+    href: "/hub",
     icon: Clock,
   },
   {
     label: "Study Rooms",
-    href: "/dashboard/rooms",
+    href: "/rooms",
     icon: Users,
   },
   {
     label: "Settings",
-    href: "/dashboard/settings",
+    href: "/settings",
     icon: Settings,
   },
 ];
@@ -70,7 +70,7 @@ export default function Sidebar() {
       <div className="p-4">
         <Button className="w-full bg-purple-600 hover:bg-purple-700" size="sm">
           <Play className="h-4 w-4 mr-2" />
-          <span className="hidden md:inline-block">Start Focus</span>
+          <span className="hidden md:inline-block">Inicia Sesión de Enfoque</span>
         </Button>
       </div>
     </aside>

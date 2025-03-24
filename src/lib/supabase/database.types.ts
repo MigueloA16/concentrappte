@@ -1,4 +1,4 @@
-// lib/supabase/database.types.ts
+// src/lib/supabase/database.types.ts
 export type Json =
   | string
   | number
@@ -45,36 +45,42 @@ export interface Database {
       focus_sessions: {
         Row: {
           id: string
-          created_at: string
           user_id: string
+          task_id: string | null
           start_time: string
           end_time: string | null
-          duration: number | null
-          task_name: string | null
-          category: string | null
-          is_completed: boolean
+          duration_minutes: number | null
+          technique_id: string | null
+          is_completed: boolean | null
+          notes: string | null
+          created_at: string | null
+          updated_at: string | null
         }
         Insert: {
           id?: string
-          created_at?: string
           user_id: string
+          task_id?: string | null
           start_time: string
           end_time?: string | null
-          duration?: number | null
-          task_name?: string | null
-          category?: string | null
-          is_completed?: boolean
+          duration_minutes?: number | null
+          technique_id?: string | null
+          is_completed?: boolean | null
+          notes?: string | null
+          created_at?: string | null
+          updated_at?: string | null
         }
         Update: {
           id?: string
-          created_at?: string
           user_id?: string
+          task_id?: string | null
           start_time?: string
           end_time?: string | null
-          duration?: number | null
-          task_name?: string | null
-          category?: string | null
-          is_completed?: boolean
+          duration_minutes?: number | null
+          technique_id?: string | null
+          is_completed?: boolean | null
+          notes?: string | null
+          created_at?: string | null
+          updated_at?: string | null
         }
       }
       study_rooms: {
@@ -135,12 +141,119 @@ export interface Database {
           focus_time?: number
         }
       }
+      tasks: {
+        Row: {
+          id: string
+          user_id: string
+          name: string
+          description: string | null
+          status: string
+          priority: string | null
+          duration_minutes: number | null
+          completed_at: string | null
+          created_at: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          name: string
+          description?: string | null
+          status?: string
+          priority?: string | null
+          duration_minutes?: number | null
+          completed_at?: string | null
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          name?: string
+          description?: string | null
+          status?: string
+          priority?: string | null
+          duration_minutes?: number | null
+          completed_at?: string | null
+          created_at?: string | null
+          updated_at?: string | null
+        }
+      }
+      time_management_techniques: {
+        Row: {
+          id: string
+          name: string
+          description: string
+          focus_time: number
+          break_length: number
+          target_sessions: number
+          created_at: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          id: string
+          name: string
+          description: string
+          focus_time: number
+          break_length: number
+          target_sessions: number
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          id?: string
+          name?: string
+          description?: string
+          focus_time?: number
+          break_length?: number
+          target_sessions?: number
+          created_at?: string | null
+          updated_at?: string | null
+        }
+      }
+      timer_settings: {
+        Row: {
+          id: string
+          user_id: string
+          technique_id: string
+          focus_time: number
+          break_length: number
+          target_sessions: number
+          created_at: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          technique_id: string
+          focus_time: number
+          break_length: number
+          target_sessions: number
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          technique_id?: string
+          focus_time?: number
+          break_length?: number
+          target_sessions?: number
+          created_at?: string | null
+          updated_at?: string | null
+        }
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      increment_focus_time: {
+        Args: {
+          minutes_to_add: number
+        }
+        Returns: void
+      }
     }
     Enums: {
       [_ in never]: never
