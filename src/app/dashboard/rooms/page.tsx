@@ -136,7 +136,7 @@ export default function StudyRoomsPage() {
       setRoomToJoin(null);
 
       // Redirect to the room
-      window.location.href = `/dashboard/rooms/${roomId}`;
+      window.location.href = `/rooms/${roomId}`;
     } catch (error: any) {
       toast.error(`Failed to join room: ${error.message}`);
     }

@@ -41,7 +41,7 @@ export default function AuthForm({ view }: AuthFormProps) {
           throw error;
         }
 
-        toast.success("Sign up successful! Please check your email for verification.");
+        toast.success("Registro exitoso! Por favor revisa tu mail para verificar tu cuenta.");
         router.push("/auth/verify");
       } else {
         const { error } = await supabase.auth.signInWithPassword({
@@ -53,7 +53,7 @@ export default function AuthForm({ view }: AuthFormProps) {
           throw error;
         }
 
-        toast.success("Signed in successfully!");
+        toast.success("Ingresaste existosamente!");
         router.push("/dashboard");
         router.refresh();
       }
@@ -77,7 +77,7 @@ export default function AuthForm({ view }: AuthFormProps) {
         throw error;
       }
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Authentication failed");
+      toast.error(error instanceof Error ? error.message : "Autenticación fallida");
     }
   };
 
@@ -109,7 +109,9 @@ export default function AuthForm({ view }: AuthFormProps) {
                 onClick={() => handleOAuthSignIn('github')}
               >
                 <Github className="mr-2 h-4 w-4" />
-                Regístrate con GitHub
+                {view === "sign-in"
+                ? "Ingresa"
+                : "Regístrate"} con GitHub
               </Button>
               <Button
                 variant="outline"
@@ -123,7 +125,9 @@ export default function AuthForm({ view }: AuthFormProps) {
                   <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
                   <path d="M1 1h22v22H1z" fill="none" />
                 </svg>
-                Regístrate con Google
+                {view === "sign-in"
+                ? "Ingresa"
+                : "Regístrate"} con Google
               </Button>
             </div>
 

@@ -614,7 +614,7 @@ export default function LandingPage() {
 
                   <div className="grid grid-cols-2 gap-4 mb-8">
                     <div>
-                      <div className="text-sm text-gray-500">Sesión</div>
+                      <div className="text-sm text-gray-500">Sesiones</div>
                       <div className="font-bold text-green-400 text-2xl">6</div>
                     </div>
                     <div>
@@ -1214,25 +1214,6 @@ export default function LandingPage() {
             </div>
           </div>
         </section>
-
-        {/* CTA section */}
-        <section className="py-16 bg-gradient-to-r from-purple-800 to-indigo-800">
-          <div className="container px-4 md:px-6 max-w-7xl mx-auto">
-            <div className="flex flex-col items-center text-center space-y-4">
-              <h2 className="text-3xl font-bold tracking-tighter md:text-4xl">
-                Ready to improve your focus?
-              </h2>
-              <p className="max-w-[700px]">
-                Join our community of focused individuals and take control of your time.
-              </p>
-              <Link href="/auth/sign-up" passHref>
-                <Button size="lg" className="bg-white text-purple-800 hover:bg-gray-100">
-                  Get Started Free
-                </Button>
-              </Link>
-            </div>
-          </div>
-        </section>
       </main>
 
       <footer className="border-t border-gray-800 bg-[#0f0f1a]">
@@ -1255,7 +1236,7 @@ export default function LandingPage() {
             </div>
           </div>
           <div className="mt-8 text-center text-sm text-gray-500">
-            © {new Date().getFullYear()} ConcentrAPPte. All rights reserved.
+            © {new Date().getFullYear()} ConcentrAPPte. Todos los derechos reservados.
           </div>
         </div>
       </footer>
