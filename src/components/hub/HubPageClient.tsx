@@ -25,15 +25,16 @@ type TimerSetting = {
 };
 
 type Task = {
-    id: string;
-    name: string;
-    description?: string;
-    status: string;
-    priority?: string;
-    duration_minutes?: number;
-    created_at: string;
-    updated_at: string;
-  };
+  id: string;
+  name: string;
+  description?: string;
+  status: string;
+  priority?: string;
+  duration_minutes?: number;
+  created_at: string;
+  updated_at: string;
+  deleted?: boolean;
+};
 
 type FocusSession = {
   id: string;
@@ -158,6 +159,7 @@ const handleTaskStatusChange = () => {
         .from("tasks")
         .select("*")
         .eq("user_id", user.id)
+        .eq("deleted", false)
         .order("created_at", { ascending: false })
         .limit(5);
 

@@ -5,17 +5,17 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { 
-  Play, 
-  Pause, 
-  SkipForward, 
-  StopCircle, 
-  CheckCircle2, 
+import {
+  Play,
+  Pause,
+  SkipForward,
+  StopCircle,
+  CheckCircle2,
   XCircle,
   Coffee,
   RotateCcw
 } from "lucide-react";
-import { 
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -31,6 +31,7 @@ type Task = {
   name: string;
   status: string;
   created_at: string;
+  deleted?: boolean;
 };
 
 type FocusTimerProps = {
@@ -40,7 +41,7 @@ type FocusTimerProps = {
   recentTasks: Task[];
   techniqueId?: string;
   onSessionComplete?: () => void;
-  onTaskStatusChange?: () => void; 
+  onTaskStatusChange?: () => void;
 };
 
 export default function FocusTimer({
@@ -62,7 +63,7 @@ export default function FocusTimer({
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const [startTime, setStartTime] = useState<Date | null>(null);
   const [currentTechniqueId, setCurrentTechniqueId] = useState(techniqueId);
-  
+
   // New states for the new features
   const [showBreakPrompt, setShowBreakPrompt] = useState(false);
   const [showTaskCompleteDialog, setShowTaskCompleteDialog] = useState(false);
@@ -74,7 +75,7 @@ export default function FocusTimer({
   // Initialize audio
   useEffect(() => {
     audioRef.current = new Audio("/sounds/bell.mp3");
-    
+
     // Add this check to prevent auto-play when component mounts
     const savedState = localStorage.getItem('timerState');
     if (savedState) {
@@ -86,7 +87,7 @@ export default function FocusTimer({
         }
       }
     }
-    
+
     return () => {
       if (audioRef.current) {
         audioRef.current.pause();
@@ -101,32 +102,32 @@ export default function FocusTimer({
     if (savedState) {
       try {
         const state = JSON.parse(savedState);
-        
+
         // Check if the saved state is still valid
         const savedTime = state.startTime ? new Date(state.startTime) : null;
         const now = new Date();
-        
+
         // If no startTime or if the session has expired naturally, don't restore
         if (!savedTime || !state.isActive) {
           // Clear invalid state
           localStorage.removeItem('timerState');
           return;
         }
-        
+
         // Calculate if the timer should have naturally ended
         const elapsedMinutes = savedTime ? Math.floor((now.getTime() - savedTime.getTime()) / 60000) : 0;
         const totalMinutes = state.isBreak ? defaultBreakLength : defaultFocusTime;
-        
+
         if (elapsedMinutes >= totalMinutes) {
           // Timer would have ended naturally, don't restore
           localStorage.removeItem('timerState');
           return;
         }
-        
+
         // Calculate the remaining time
         const remainingMinutes = Math.max(0, totalMinutes - elapsedMinutes - 1);
         const remainingSeconds = Math.max(0, 59 - Math.floor((now.getTime() - savedTime.getTime()) / 1000) % 60);
-        
+
         // Restore valid state with adjusted time
         setMinutes(remainingMinutes);
         setSeconds(remainingSeconds);
@@ -150,7 +151,7 @@ export default function FocusTimer({
       }
     }
   }, [defaultBreakLength, defaultFocusTime, techniqueId]);
-  
+
   // Find selected task when task ID changes
   useEffect(() => {
     if (selectedTaskId) {
@@ -162,7 +163,7 @@ export default function FocusTimer({
       setCurrentTask(null);
     }
   }, [selectedTaskId, recentTasks, customTaskName]);
-  
+
   // Update techniqueId when it changes from props
   useEffect(() => {
     setCurrentTechniqueId(techniqueId);
@@ -177,6 +178,37 @@ export default function FocusTimer({
         setSelectedTaskId(task.id);
         setCurrentTask(task);
         localStorage.removeItem('selectedTask'); // Clear it after use
+      } catch (error) {
+        console.error("Error parsing saved task:", error);
+      }
+    }
+  }, [isActive, currentSessionId]);
+
+  // Handle saved task from local storage (for task integration)
+  useEffect(() => {
+    const savedTask = localStorage.getItem('selectedTask');
+    const autoStart = localStorage.getItem('autoStartSession');
+
+    if (savedTask && !isActive && !currentSessionId) {
+      try {
+        const task = JSON.parse(savedTask);
+        setSelectedTaskId(task.id);
+        setCurrentTask(task);
+        setCustomTaskName(task.name || "");
+
+        // If auto-start flag is set, start the timer automatically after a short delay
+        // to ensure all state updates have been applied
+        if (autoStart === 'true') {
+          const timer = setTimeout(() => {
+            startTimer();
+          }, 300);
+
+          // Clean up timeout if component unmounts
+          return () => clearTimeout(timer);
+        }
+
+        localStorage.removeItem('selectedTask'); // Clear it after use
+        localStorage.removeItem('autoStartSession'); // Clear auto-start flag
       } catch (error) {
         console.error("Error parsing saved task:", error);
       }
@@ -207,15 +239,15 @@ export default function FocusTimer({
 
     saveTimerState();
   }, [
-    minutes, 
-    seconds, 
-    isActive, 
-    isBreak, 
-    sessionCount, 
-    selectedTaskId, 
-    customTaskName, 
-    currentSessionId, 
-    currentTechniqueId, 
+    minutes,
+    seconds,
+    isActive,
+    isBreak,
+    sessionCount,
+    selectedTaskId,
+    customTaskName,
+    currentSessionId,
+    currentTechniqueId,
     startTime,
     showBreakPrompt,
     currentTask
@@ -249,7 +281,7 @@ export default function FocusTimer({
               // Focus session finished
               setIsActive(false);
               handleSessionComplete();
-              
+
               // Set up for break but don't start it automatically
               setShowBreakPrompt(true);
               toast.success("¡Sesión de enfoque completada! Toma un descanso cuando estés listo.");
@@ -270,78 +302,79 @@ export default function FocusTimer({
   }, [isActive, minutes, seconds, isBreak, defaultFocusTime, defaultBreakLength, defaultTargetSessions, sessionCount]);
 
 
-const startTimer = async () => {
-  // If showing break prompt, don't start a new session
-  if (showBreakPrompt) {
-    return;
-  }
-  
-  // If on a break, just start the timer without creating a session
-  if (isBreak) {
-    setIsActive(true);
-    return;
-  }
-  
-  // Check if we need to select a task first
-  if (!selectedTaskId && !customTaskName.trim()) {
-    toast.error("Por favor, ingresa o selecciona una tarea");
-    return;
-  }
-
-  try {
-    // Get current user
-    const { data: { user } } = await supabase.auth.getUser();
-
-    if (!user) {
-      throw new Error("Usuario no autenticado");
+  const startTimer = async () => {
+    // If showing break prompt, don't start a new session
+    if (showBreakPrompt) {
+      return;
     }
 
-    let taskId = selectedTaskId;
-    
-    // If using a custom task name, create a new task first
-    if (!selectedTaskId && customTaskName.trim()) {
-      const { data: newTask, error: taskError } = await supabase
-        .from("tasks")
+    // If on a break, just start the timer without creating a session
+    if (isBreak) {
+      setIsActive(true);
+      return;
+    }
+
+    // Check if we need to select a task first
+    if (!selectedTaskId && !customTaskName.trim()) {
+      toast.error("Por favor, ingresa o selecciona una tarea");
+      return;
+    }
+
+    try {
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+
+      if (!user) {
+        throw new Error("Usuario no autenticado");
+      }
+
+      let taskId = selectedTaskId;
+
+      // If using a custom task name, create a new task first
+      if (!selectedTaskId && customTaskName.trim()) {
+        const { data: newTask, error: taskError } = await supabase
+          .from("tasks")
+          .insert({
+            user_id: user.id,
+            name: customTaskName.trim(),
+            status: "pending",
+            deleted: false
+          })
+          .select()
+          .single();
+
+        if (taskError) throw taskError;
+
+        taskId = newTask.id;
+        setCurrentTask(newTask);
+      }
+
+      // Create a new focus session in Supabase
+      const now = new Date();
+      const { data, error } = await supabase
+        .from("focus_sessions")
         .insert({
           user_id: user.id,
-          name: customTaskName.trim(),
-          status: "pending"
+          task_id: taskId,
+          start_time: now.toISOString(),
+          is_completed: false,
+          technique_id: currentTechniqueId // Store the technique ID with the session
         })
         .select()
         .single();
-        
-      if (taskError) throw taskError;
-      
-      taskId = newTask.id;
-      setCurrentTask(newTask);
+
+      if (error) throw error;
+
+      setCurrentSessionId(data.id);
+      setStartTime(now);
+      setIsActive(true);
+      setShowBreakPrompt(false);
+      toast.success("¡Sesión de enfoque iniciada!");
+    } catch (error) {
+      console.error("Error al iniciar la sesión:", error);
+      toast.error(error instanceof Error ? error.message : "Error al iniciar la sesión");
     }
-
-    // Create a new focus session in Supabase
-    const now = new Date();
-    const { data, error } = await supabase
-      .from("focus_sessions")
-      .insert({
-        user_id: user.id,
-        task_id: taskId,
-        start_time: now.toISOString(),
-        is_completed: false,
-        technique_id: currentTechniqueId // Store the technique ID with the session
-      })
-      .select()
-      .single();
-
-    if (error) throw error;
-
-    setCurrentSessionId(data.id);
-    setStartTime(now);
-    setIsActive(true);
-    setShowBreakPrompt(false);
-    toast.success("¡Sesión de enfoque iniciada!");
-  } catch (error) {
-    console.error("Error al iniciar la sesión:", error);
-    toast.error(error instanceof Error ? error.message : "Error al iniciar la sesión");
-  }
-};
+  };
 
   const pauseTimer = () => {
     setIsActive(false);
@@ -354,7 +387,7 @@ const startTimer = async () => {
     setStartTime(null);
     setShowBreakPrompt(false);
   };
-  
+
   // Start the break session
   const startBreak = () => {
     setIsBreak(true);
@@ -365,7 +398,7 @@ const startTimer = async () => {
     setShowBreakPrompt(false);
     toast.success("¡Comenzando descanso!");
   };
-  
+
   // Skip the break
   const skipBreak = () => {
     // Important: Keep the task intact for the dialog
@@ -374,11 +407,11 @@ const startTimer = async () => {
     setSeconds(0);
     setShowBreakPrompt(false);
     setSessionCount(prevCount => prevCount + 1);
-    
+
     // Show task complete dialog
     setShowTaskCompleteDialog(true);
   };
-  
+
   // Handle task complete dialog response
   const handleTaskComplete = async (complete: boolean) => {
     if (complete && currentTask) {
@@ -386,17 +419,17 @@ const startTimer = async () => {
         // Update the task status to completed in the database
         const { error } = await supabase
           .from("tasks")
-          .update({ 
+          .update({
             status: "completed",
             updated_at: new Date().toISOString(),
             completed_at: new Date().toISOString()
           })
           .eq("id", currentTask.id);
-        
+
         if (error) throw error;
-        
+
         toast.success(`Tarea "${currentTask.name}" marcada como completada`);
-        
+
         // Notify parent component
         if (onTaskStatusChange) {
           onTaskStatusChange();
@@ -406,43 +439,43 @@ const startTimer = async () => {
         toast.error("Error al marcar la tarea como completada");
       }
     }
-    
+
     // Close the dialog
     setShowTaskCompleteDialog(false);
-    
+
     // Reset task selection AFTER handling the dialog response
     setSelectedTaskId(null);
     setCustomTaskName("");
     setCurrentTask(null);
-    
+
     // If we've completed all sessions, reset the counter
     if (sessionCount >= defaultTargetSessions) {
       setSessionCount(0);
       toast.success("¡Felicitaciones! Has completado todas tus sesiones de enfoque.");
     }
   };
-  
+
   // New function to finish session early
   const finishEarly = async () => {
     if (!currentSessionId || isBreak) return;
-    
+
     try {
       // Calculate the time spent so far
       const startTimeObj = startTime ? new Date(startTime) : null;
       if (!startTimeObj) {
         throw new Error("No start time recorded");
       }
-      
+
       const now = new Date();
       // Calculate minutes elapsed
       const minutesElapsed = Math.floor((now.getTime() - startTimeObj.getTime()) / 60000);
-      
+
       // Only record if at least 1 minute has elapsed
       if (minutesElapsed < 1) {
         toast.error("La sesión debe durar al menos 1 minuto para ser registrada");
         return;
       }
-      
+
       // Update the session in Supabase
       const { error } = await supabase
         .from("focus_sessions")
@@ -454,28 +487,28 @@ const startTimer = async () => {
         .eq("id", currentSessionId);
 
       if (error) throw error;
-      
+
       // Update user's total_focus_time using RPC
       await supabase.rpc("increment_focus_time", {
         minutes_to_add: minutesElapsed,
       });
-      
+
       // Reset timer state
       setIsActive(false);
       setMinutes(defaultFocusTime);
       setSeconds(0);
       cleanupTimerState();
-      
+
       // Show task complete dialog
       setShowTaskCompleteDialog(true);
-      
+
       // Call callback if provided
       if (onSessionComplete) {
         onSessionComplete();
       }
-      
+
       toast.success(`¡Sesión completada! Has registrado ${minutesElapsed} minutos de enfoque.`);
-      
+
     } catch (error) {
       console.error("Error al finalizar la sesión:", error);
       toast.error(error instanceof Error ? error.message : "Error al finalizar la sesión");
@@ -486,8 +519,47 @@ const startTimer = async () => {
     setIsActive(false);
     setMinutes(isBreak ? defaultBreakLength : defaultFocusTime);
     setSeconds(0);
-    cleanupTimerState(); 
+    cleanupTimerState();
     toast.info("Temporizador reiniciado");
+  };
+
+  // Add a new helper function to start the timer with a task
+  const handleStartTimer = async (taskId: string) => {
+    if (!taskId) return;
+
+    try {
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+
+      if (!user) {
+        throw new Error("Usuario no autenticado");
+      }
+
+      // Create a new focus session in Supabase
+      const now = new Date();
+      const { data, error } = await supabase
+        .from("focus_sessions")
+        .insert({
+          user_id: user.id,
+          task_id: taskId,
+          start_time: now.toISOString(),
+          is_completed: false,
+          technique_id: currentTechniqueId
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      setCurrentSessionId(data.id);
+      setStartTime(now);
+      setIsActive(true);
+      setShowBreakPrompt(false);
+      toast.success("¡Sesión de enfoque iniciada!");
+    } catch (error) {
+      console.error("Error al iniciar la sesión:", error);
+      toast.error(error instanceof Error ? error.message : "Error al iniciar la sesión");
+    }
   };
 
   const handleSessionComplete = async () => {
@@ -518,7 +590,7 @@ const startTimer = async () => {
 
       setCurrentSessionId(null);
       setStartTime(null);
-      
+
       // Call callback if provided
       if (onSessionComplete) {
         onSessionComplete();
@@ -539,7 +611,7 @@ const startTimer = async () => {
           <CardDescription className="text-gray-400">
             {isBreak
               ? `Toma un descanso y vuelve en ${defaultBreakLength} minutos`
-              : `${currentTask?.name ? 'Tarea' + currentTask?.name : 'Comienza tu sesión de enfoque para aumentar tu productividad'}`
+              : `${currentTask?.name ? 'Tarea : ' + currentTask?.name : 'Comienza tu sesión de enfoque para aumentar tu productividad'}`
             }
           </CardDescription>
         </CardHeader>
@@ -643,7 +715,7 @@ const startTimer = async () => {
                 )}
               </>
             )}
-            
+
             {/* Break Prompt - show when a focus session just ended */}
             {showBreakPrompt && (
               <div className="space-y-4 bg-[#262638] p-4 rounded-lg border border-gray-700">
@@ -704,7 +776,7 @@ const startTimer = async () => {
                 </Button>
               </div>
             )}
-            
+
             {/* Finish early button - only show during active focus session */}
             {isActive && !isBreak && (
               <Button
@@ -719,7 +791,7 @@ const startTimer = async () => {
           </div>
         </CardContent>
       </Card>
-      
+
       {/* Task Complete Dialog */}
       <Dialog open={showTaskCompleteDialog} onOpenChange={setShowTaskCompleteDialog}>
         <DialogContent className="bg-[#1a1a2e] border-gray-800 text-white">
@@ -733,17 +805,17 @@ const startTimer = async () => {
               )}
             </DialogDescription>
           </DialogHeader>
-          
+
           {currentTask && (
             <div className="flex space-x-2 mt-4">
-              <Button 
+              <Button
                 onClick={() => handleTaskComplete(true)}
                 className="flex-1 bg-purple-600 hover:bg-purple-700"
               >
                 <CheckCircle2 className="h-4 w-4 mr-2" />
                 Sí, completada
               </Button>
-              <Button 
+              <Button
                 onClick={() => handleTaskComplete(false)}
                 variant="outline"
                 className="flex-1 border-gray-600"
@@ -753,7 +825,7 @@ const startTimer = async () => {
               </Button>
             </div>
           )}
-          
+
           {!currentTask && (
             <DialogFooter>
               <Button onClick={() => handleTaskComplete(false)}>

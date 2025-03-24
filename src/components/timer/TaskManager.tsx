@@ -34,8 +34,8 @@ type Task = {
   duration_minutes?: number;
   created_at: string;
   updated_at: string;
+  deleted?: boolean;
 };
-
 type TaskManagerProps = {
   tasks: Task[];
   onTasksChanged?: () => void; // New callback prop
@@ -70,6 +70,7 @@ export default function TaskManager({ tasks: initialTasks = [], onTasksChanged }
           name: newTaskName.trim(),
           status: "pending",
           user_id: user.id,
+          deleted: false
         })
         .select()
         .single();
@@ -132,9 +133,12 @@ export default function TaskManager({ tasks: initialTasks = [], onTasksChanged }
   const deleteTask = async (id: string) => {
     try {
       const { error } = await supabase
-        .from("tasks")
-        .delete()
-        .eq("id", id);
+      .from("tasks")
+      .update({ 
+        deleted: true,
+        updated_at: new Date().toISOString()
+      })
+      .eq("id", id);
 
       if (error) throw error;
 
@@ -157,15 +161,24 @@ export default function TaskManager({ tasks: initialTasks = [], onTasksChanged }
 
   const startFocusSession = (task: Task) => {
     try {
-      // Save the task to localStorage to be picked up by the timer component
+      // First clear all existing timers and flags
+      localStorage.removeItem('timerState');
+      localStorage.removeItem('selectedTask');
+      localStorage.removeItem('autoStartSession');
+      
+      // Then set our task and auto-start flag
+      console.log("Starting focus session for task:", task.name, task.id);
       localStorage.setItem('selectedTask', JSON.stringify(task));
+      localStorage.setItem('autoStartSession', 'true');
       
-      // Redirect to the timer tab or use any mechanism your app has for switching to the timer
-      toast.info(`Iniciando sesión de enfoque para: ${task.name}`);
+      // Notify the user
+      toast.info(`Preparando sesión de enfoque para: ${task.name}`);
       
-      // For Next.js - redirecting to the timer tab
-      // You'll need to adapt this to your app's navigation structure
-      router.push('/hub/?tab=timer');
+      // Add a slight delay before navigation to ensure localStorage is set
+      setTimeout(() => {
+        // For Next.js - redirecting to the timer tab
+        router.push('/hub/?tab=timer');
+      }, 100);
     } catch (error) {
       console.error("Error starting focus session:", error);
       toast.error("Error al iniciar la sesión de enfoque");

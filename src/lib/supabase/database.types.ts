@@ -153,6 +153,7 @@ export interface Database {
           completed_at: string | null
           created_at: string | null
           updated_at: string | null
+          deleted: boolean | null
         }
         Insert: {
           id?: string
@@ -165,6 +166,7 @@ export interface Database {
           completed_at?: string | null
           created_at?: string | null
           updated_at?: string | null
+          deleted?: boolean | null
         }
         Update: {
           id?: string
@@ -177,6 +179,7 @@ export interface Database {
           completed_at?: string | null
           created_at?: string | null
           updated_at?: string | null
+          deleted?: boolean | null
         }
       }
       time_management_techniques: {
