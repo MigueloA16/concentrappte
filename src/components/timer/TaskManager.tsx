@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { 
@@ -23,6 +23,7 @@ import { Badge } from "@/components/ui/badge";
 import { Play, MoreVertical, Check, Clock, LayoutGrid, Trash, CheckCircle2, XCircle } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
 import { toast } from "sonner";
+import { useRouter } from "next/navigation";
 
 type Task = {
   id: string;
@@ -37,13 +38,20 @@ type Task = {
 
 type TaskManagerProps = {
   tasks: Task[];
+  onTasksChanged?: () => void; // New callback prop
 };
 
-export default function TaskManager({ tasks: initialTasks = [] }: TaskManagerProps) {
+export default function TaskManager({ tasks: initialTasks = [], onTasksChanged }: TaskManagerProps) {
+  const router = useRouter();
   const [tasks, setTasks] = useState<Task[]>(initialTasks);
   const [newTaskName, setNewTaskName] = useState("");
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [loading, setLoading] = useState(false);
+
+  // Keep tasks in sync with initialTasks prop (useful when parent component refreshes data)
+  useEffect(() => {
+    setTasks(initialTasks);
+  }, [initialTasks]);
 
   const createTask = async () => {
     if (!newTaskName.trim()) {
@@ -71,6 +79,15 @@ export default function TaskManager({ tasks: initialTasks = [] }: TaskManagerPro
       setTasks([data, ...tasks]);
       setNewTaskName("");
       toast.success("Tarea creada exitosamente");
+      
+      // Notify parent component
+      if (onTasksChanged) {
+        onTasksChanged();
+      }
+      
+      // Refresh page data
+      router.refresh();
+      
     } catch (error) {
       console.error("Error al crear la tarea:", error);
       toast.error("Error al crear la tarea");
@@ -97,6 +114,15 @@ export default function TaskManager({ tasks: initialTasks = [] }: TaskManagerPro
       ));
       
       toast.success(`Tarea ${status === "completed" ? "completada" : "actualizada"}`);
+      
+      // Notify parent component
+      if (onTasksChanged) {
+        onTasksChanged();
+      }
+      
+      // Refresh page data
+      router.refresh();
+      
     } catch (error) {
       console.error("Error al actualizar la tarea:", error);
       toast.error("Error al actualizar la tarea");
@@ -114,16 +140,36 @@ export default function TaskManager({ tasks: initialTasks = [] }: TaskManagerPro
 
       setTasks(tasks.filter(task => task.id !== id));
       toast.success("Tarea eliminada exitosamente");
+      
+      // Notify parent component
+      if (onTasksChanged) {
+        onTasksChanged();
+      }
+      
+      // Refresh page data
+      router.refresh();
+      
     } catch (error) {
       console.error("Error al eliminar la tarea:", error);
       toast.error("Error al eliminar la tarea");
     }
   };
 
-  const startFocusSession = () => {
-    // This would typically navigate to the timer with the selected task
-    // For now, we'll just show a toast
-    toast.info("Iniciando sesión de enfoque");
+  const startFocusSession = (task: Task) => {
+    try {
+      // Save the task to localStorage to be picked up by the timer component
+      localStorage.setItem('selectedTask', JSON.stringify(task));
+      
+      // Redirect to the timer tab or use any mechanism your app has for switching to the timer
+      toast.info(`Iniciando sesión de enfoque para: ${task.name}`);
+      
+      // For Next.js - redirecting to the timer tab
+      // You'll need to adapt this to your app's navigation structure
+      router.push('/hub/?tab=timer');
+    } catch (error) {
+      console.error("Error starting focus session:", error);
+      toast.error("Error al iniciar la sesión de enfoque");
+    }
   };
 
   const getStatusBadge = (status: string) => {
@@ -193,8 +239,9 @@ export default function TaskManager({ tasks: initialTasks = [] }: TaskManagerPro
                     <Button 
                       variant="ghost" 
                       size="sm"
-                      onClick={() => startFocusSession()}
+                      onClick={() => startFocusSession(task)}
                       className="h-8 w-8 p-0 text-green-400 hover:text-green-300 hover:bg-green-900/20"
+                      disabled={task.status === "completed"}
                     >
                       <Play className="h-4 w-4" />
                     </Button>

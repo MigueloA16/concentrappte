@@ -10,6 +10,7 @@ import { Slider } from "@/components/ui/slider";
 import { Clock, Info } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
 import { toast } from "sonner";
+import { useRouter } from "next/navigation";
 
 // Define time management techniques with their default values
 const TIME_MANAGEMENT_TECHNIQUES = [
@@ -65,10 +66,12 @@ const TIME_MANAGEMENT_TECHNIQUES = [
 
 interface TimerSettingsProps {
   initialSettings?: any; // Or define a more specific type
+  onSettingsChanged?: () => void; // New callback prop for notifying parent component
 }
 
 
-export default function TimerSettings({ initialSettings }: TimerSettingsProps) {
+export default function TimerSettings({ initialSettings, onSettingsChanged }: TimerSettingsProps) {
+  const router = useRouter();
   const [selectedTechniqueId, setSelectedTechniqueId] = useState(TIME_MANAGEMENT_TECHNIQUES[0].id);
   const [focusTime, setFocusTime] = useState(TIME_MANAGEMENT_TECHNIQUES[0].focusTime);
   const [breakLength, setBreakLength] = useState(TIME_MANAGEMENT_TECHNIQUES[0].breakLength);
@@ -196,6 +199,15 @@ export default function TimerSettings({ initialSettings }: TimerSettingsProps) {
       if (error) throw error;
 
       toast.success("Configuración guardada exitosamente");
+      
+      // Call the callback to notify parent component of the update
+      if (onSettingsChanged) {
+        onSettingsChanged();
+      }
+      
+      // Refresh the page data
+      router.refresh();
+      
     } catch (error) {
       console.error("Error saving timer settings:", error);
       toast.error("Error al guardar la configuración");

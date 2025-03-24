@@ -249,16 +249,16 @@ export default function LandingPage() {
                 <CarouselItem>
                   <div className="bg-[#1a1a2e] border border-gray-800 rounded-xl overflow-hidden shadow-2xl p-6">
                     <div className="text-center mb-6">
-                      <h3 className="text-2xl font-bold text-white">Study Rooms</h3>
-                      <p className="text-gray-400">Focus together with others for better accountability</p>
+                      <h3 className="text-2xl font-bold text-white">Grupos de Estudio</h3>
+                      <p className="text-gray-400">Concéntrate en trabajar junto con otros para lograr mejores resultados en tu productividad</p>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div className="bg-[#131325] rounded-lg p-4">
                         <div className="flex justify-between items-center mb-3">
-                          <h4 className="font-bold text-white">Coding Marathon</h4>
+                          <h4 className="font-bold text-white">Maratón de Desarollo</h4>
                           <span className="bg-green-900/50 text-green-400 text-xs px-2 py-1 rounded-full">8 online</span>
                         </div>
-                        <p className="text-sm text-gray-400 mb-4">Deep focus coding session with breaks every 25 minutes.</p>
+                        <p className="text-sm text-gray-400 mb-4">Sesión de desarrollo con descansos cada 25 minutos.</p>
                         <div className="flex space-x-2">
                           <div className="h-8 w-8 bg-purple-500 rounded-full flex items-center justify-center text-xs font-bold">JD</div>
                           <div className="h-8 w-8 bg-blue-500 rounded-full flex items-center justify-center text-xs font-bold">AK</div>
@@ -270,24 +270,24 @@ export default function LandingPage() {
 
                       <div className="bg-[#131325] rounded-lg p-4">
                         <div className="flex justify-between items-center mb-3">
-                          <h4 className="font-bold text-white">Study Group Alpha</h4>
+                          <h4 className="font-bold text-white">Grupo de Estudio Alfa</h4>
                           <span className="bg-green-900/50 text-green-400 text-xs px-2 py-1 rounded-full">5 online</span>
                         </div>
-                        <p className="text-sm text-gray-400 mb-4">Silent study room for maximum concentration. 45-minute sessions.</p>
+                        <p className="text-sm text-gray-400 mb-4">Sala de estudio silenciosa para máxima concentración. Sesiones de 45 minutos.</p>
                         <div className="flex space-x-2">
                           <div className="h-8 w-8 bg-orange-500 rounded-full flex items-center justify-center text-xs font-bold">SL</div>
                           <div className="h-8 w-8 bg-pink-500 rounded-full flex items-center justify-center text-xs font-bold">RK</div>
                           <div className="h-8 w-8 bg-yellow-500 rounded-full flex items-center justify-center text-xs font-bold">BM</div>
                           <div className="h-8 w-8 bg-gray-700 rounded-full flex items-center justify-center text-xs font-bold text-gray-400">+2</div>
                         </div>
-                        <Button className="w-full mt-4 bg-purple-600 hover:bg-purple-700">Join Room</Button>
+                        <Button className="w-full mt-4 bg-purple-600 hover:bg-purple-700">Ingresar al Grupo</Button>
                       </div>
                     </div>
 
                     <div className="mt-6 flex justify-center">
                       <Button variant="outline" className="border-gray-700 text-gray-300">
                         <Users className="h-4 w-4 mr-2" />
-                        Create New Room
+                        Crear Nuevo Grupo
                       </Button>
                     </div>
                   </div>
