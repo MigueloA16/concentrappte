@@ -23,7 +23,7 @@ const navItems = [
     icon: Clock,
   },
   {
-    label: "Study Rooms",
+    label: "Grupos de Estudio",
     href: "/rooms",
     icon: Users,
   },

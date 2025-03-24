@@ -145,17 +145,17 @@ export default function StudyRoomsPage() {
   return (
     <div className="container mx-auto py-8">
       <div className="flex justify-between items-center mb-8">
-        <h1 className="text-3xl font-bold">Study Rooms</h1>
+        <h1 className="text-3xl font-bold">Grupos de Estudio</h1>
         <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
           <DialogTrigger asChild>
             <Button>
               <Plus className="h-4 w-4 mr-2" />
-              Create Room
+              Crear Grupo
             </Button>
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Create a New Study Room</DialogTitle>
+              <DialogTitle>Crear un Nuevo Grupo de Estudio</DialogTitle>
               <DialogDescription>
                 Create a room to study with friends or other learners.
               </DialogDescription>
@@ -163,7 +163,7 @@ export default function StudyRoomsPage() {
             <div className="space-y-4 py-4">
               <div className="space-y-2">
                 <label htmlFor="roomName" className="text-sm font-medium">
-                  Room Name
+                  Nombre del Grupo
                 </label>
                 <Input
                   id="roomName"
@@ -195,7 +195,7 @@ export default function StudyRoomsPage() {
               {isPrivate && (
                 <div className="space-y-2">
                   <p className="text-sm text-muted-foreground">
-                    A unique access code will be generated for your private room.
+                    Un código de acceso único será generado para ingresar a éstos grupos.
                   </p>
                 </div>
               )}
