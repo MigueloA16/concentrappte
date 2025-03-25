@@ -20,7 +20,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
-import { Play, MoreVertical, Check, Clock, LayoutGrid, Trash, CheckCircle2, XCircle } from "lucide-react";
+import { Play, MoreVertical, Check, Clock, LayoutGrid, Trash, CheckCircle2, XCircle, ChevronLeft, ChevronRight } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
@@ -36,9 +36,10 @@ type Task = {
   updated_at: string;
   deleted?: boolean;
 };
+
 type TaskManagerProps = {
   tasks: Task[];
-  onTasksChanged?: () => void; // New callback prop
+  onTasksChanged?: () => void;
 };
 
 export default function TaskManager({ tasks: initialTasks = [], onTasksChanged }: TaskManagerProps) {
@@ -47,11 +48,75 @@ export default function TaskManager({ tasks: initialTasks = [], onTasksChanged }
   const [newTaskName, setNewTaskName] = useState("");
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [loading, setLoading] = useState(false);
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalTasks, setTotalTasks] = useState(0);
+  const tasksPerPage = 5;
 
-  // Keep tasks in sync with initialTasks prop (useful when parent component refreshes data)
+  // Get total task count on initial load
   useEffect(() => {
-    setTasks(initialTasks);
-  }, [initialTasks]);
+    const fetchTaskCount = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+
+        const { count, error } = await supabase
+          .from("tasks")
+          .select("*", { count: 'exact', head: true })
+          .eq("user_id", user.id)
+          .eq("deleted", false);
+
+        if (error) throw error;
+        setTotalTasks(count || 0);
+      } catch (error) {
+        console.error("Error fetching task count:", error);
+      }
+    };
+
+    fetchTaskCount();
+  }, []);
+
+  // Fetch tasks based on current page
+  const fetchTasks = async (page = 1) => {
+    try {
+      setLoading(true);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      // Calculate offset for pagination
+      const offset = (page - 1) * tasksPerPage;
+
+      const { data, error } = await supabase
+        .from("tasks")
+        .select("*")
+        .eq("user_id", user.id)
+        .eq("deleted", false)
+        .order("created_at", { ascending: false })
+        .range(offset, offset + tasksPerPage - 1);
+
+      if (error) throw error;
+      setTasks(data || []);
+      setCurrentPage(page);
+    } catch (error) {
+      console.error("Error fetching tasks:", error);
+      toast.error("Error fetching tasks");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Handle page changes
+  const goToPage = (page: number) => {
+    fetchTasks(page);
+  };
+
+  // Keep tasks in sync with initialTasks prop for the first page
+  useEffect(() => {
+    if (currentPage === 1) {
+      setTasks(initialTasks);
+    }
+  }, [initialTasks, currentPage]);
 
   const createTask = async () => {
     if (!newTaskName.trim()) {
@@ -77,7 +142,23 @@ export default function TaskManager({ tasks: initialTasks = [], onTasksChanged }
 
       if (error) throw error;
 
-      setTasks([data, ...tasks]);
+      // Update the task count
+      setTotalTasks(prev => prev + 1);
+      
+      // If we're on the first page, add the task to the list
+      if (currentPage === 1) {
+        // Add the new task at the beginning and remove the last one if more than tasksPerPage
+        const updatedTasks = [data, ...tasks];
+        if (updatedTasks.length > tasksPerPage) {
+          updatedTasks.length = tasksPerPage;
+        }
+        setTasks(updatedTasks);
+      } else {
+        // If on a different page, navigate to the first page to see the new task
+        setCurrentPage(1);
+        fetchTasks(1);
+      }
+      
       setNewTaskName("");
       toast.success("Tarea creada exitosamente");
       
@@ -133,16 +214,18 @@ export default function TaskManager({ tasks: initialTasks = [], onTasksChanged }
   const deleteTask = async (id: string) => {
     try {
       const { error } = await supabase
-      .from("tasks")
-      .update({ 
-        deleted: true,
-        updated_at: new Date().toISOString()
-      })
-      .eq("id", id);
+        .from("tasks")
+        .update({ 
+          deleted: true,
+          updated_at: new Date().toISOString()
+        })
+        .eq("id", id);
 
       if (error) throw error;
 
       setTasks(tasks.filter(task => task.id !== id));
+      setTotalTasks(prev => prev - 1);
+      
       toast.success("Tarea eliminada exitosamente");
       
       // Notify parent component
@@ -197,6 +280,9 @@ export default function TaskManager({ tasks: initialTasks = [], onTasksChanged }
     }
   };
 
+  // Calculate total pages
+  const totalPages = Math.ceil(totalTasks / tasksPerPage);
+
   return (
     <Card className="w-full bg-[#1a1a2e] border-gray-800">
       <CardHeader>
@@ -221,7 +307,7 @@ export default function TaskManager({ tasks: initialTasks = [], onTasksChanged }
               disabled={loading || !newTaskName.trim()}
               className="bg-purple-600 hover:bg-purple-700"
             >
-              {loading ? "Añadiendo..." : "Añadir"}
+              {loading ? "..." : "Añadir"}
             </Button>
           </div>
 
@@ -308,19 +394,46 @@ export default function TaskManager({ tasks: initialTasks = [], onTasksChanged }
               <p className="mt-2">Añade una tarea para comenzar a trabajar</p>
             </div>
           )}
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-center space-x-2 mt-4">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => goToPage(currentPage - 1)}
+                disabled={currentPage === 1 || loading}
+                className="h-8 w-8 p-0 border-gray-700"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              
+              <div className="text-sm text-gray-400">
+                Página {currentPage} de {totalPages}
+              </div>
+              
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => goToPage(currentPage + 1)}
+                disabled={currentPage === totalPages || loading}
+                className="h-8 w-8 p-0 border-gray-700"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+          )}
         </div>
       </CardContent>
       
-      {tasks.length > 0 && (
-        <CardFooter className="border-t border-gray-800 px-6 py-4">
-          <div className="flex items-center justify-between w-full text-sm text-gray-400">
-            <div>Total: {tasks.length} tareas</div>
-            <div>
-              Completadas: {tasks.filter(t => t.status === "completed").length} / {tasks.length}
-            </div>
+      <CardFooter className="border-t border-gray-800 px-6 py-4">
+        <div className="flex items-center justify-between w-full text-sm text-gray-400">
+          <div>Total: {totalTasks} tareas</div>
+          <div>
+            Completadas: {tasks.filter(t => t.status === "completed").length} / {tasks.length} (en esta página)
           </div>
-        </CardFooter>
-      )}
+        </div>
+      </CardFooter>
     </Card>
   );
 }
