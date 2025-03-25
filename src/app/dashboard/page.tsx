@@ -10,7 +10,7 @@ export default async function DashboardPage() {
   const profile = await getUserProfile();
   const supabase = await createClient();
 
-  // Get recent sessions - order by end_time now
+  // Get recent sessions - order by end_time
   const { data: recentSessions } = await supabase
     .from("focus_sessions")
     .select(`
@@ -19,7 +19,7 @@ export default async function DashboardPage() {
   `)
     .eq("user_id", profile?.id || '')
     .order("end_time", { ascending: false })
-    .limit(3);
+    .limit(10); // Increased limit to get more data for calculations
 
   // Get ALL achievements
   const { data: allAchievements } = await supabase
@@ -64,6 +64,13 @@ export default async function DashboardPage() {
       unlocked_at: userProgress?.unlocked_at || null
     };
   }) || [];
+
+  // Get daily activity data for heatmap visualization
+  const { data: dailyActivity } = await supabase
+    .from("daily_activity")
+    .select("*")
+    .eq("user_id", profile?.id || '')
+    .order("date", { ascending: true });
 
   return (
     <Suspense fallback={<div>Cargando...</div>}>

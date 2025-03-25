@@ -125,7 +125,6 @@ export default function Sidebar() {
                   }`}
                 >
                   <Icon className={`h-5 w-5 mb-1 ${isActive ? "text-purple-400" : ""}`} />
-                  <span className="text-xs font-medium">{item.label}</span>
                 </Button>
               </Link>
             );

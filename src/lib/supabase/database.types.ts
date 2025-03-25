@@ -1,4 +1,4 @@
-// src/lib/supabase/database.types.ts
+// Updated src/lib/supabase/database.types.ts
 export type Json =
   | string
   | number
@@ -20,6 +20,10 @@ export interface Database {
           total_focus_time: number
           streak_days: number
           last_active_date: string | null
+          best_streak: number
+          daily_motivation: string | null
+          target_hours: number | null
+          level_name: string | null
         }
         Insert: {
           id: string
@@ -30,6 +34,10 @@ export interface Database {
           total_focus_time?: number
           streak_days?: number
           last_active_date?: string | null
+          best_streak?: number
+          daily_motivation?: string | null
+          target_hours?: number | null
+          level_name?: string | null
         }
         Update: {
           id?: string
@@ -40,6 +48,39 @@ export interface Database {
           total_focus_time?: number
           streak_days?: number
           last_active_date?: string | null
+          best_streak?: number
+          daily_motivation?: string | null
+          target_hours?: number | null
+          level_name?: string | null
+        }
+      }
+      daily_activity: {
+        Row: {
+          id: string
+          user_id: string
+          date: string
+          total_minutes: number
+          sessions_count: number
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          date: string
+          total_minutes?: number
+          sessions_count?: number
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          date?: string
+          total_minutes?: number
+          sessions_count?: number
+          created_at?: string
+          updated_at?: string
         }
       }
       focus_sessions: {
@@ -318,6 +359,18 @@ export interface Database {
         }
         Returns: void
       }
+      update_daily_motivation: {
+        Args: {
+          motivation: string
+        }
+        Returns: void
+      }
+      update_target_hours: {
+        Args: {
+          hours: number
+        }
+        Returns: void
+      }
     }
     Enums: {
       [_ in never]: never
@@ -336,4 +389,14 @@ export type AchievementWithProgress = Achievement & {
   progress: number;
   unlocked: boolean;
   unlocked_at: string | null;
+};
+
+// DailyActivity type for heatmap
+export type DailyActivity = Database['public']['Tables']['daily_activity']['Row'];
+
+// Enhanced Profile type
+export type ProfileWithLevel = Database['public']['Tables']['profiles']['Row'] & {
+  levelProgress: number;
+  nextLevel?: string;
+  nextLevelThreshold?: number;
 };
