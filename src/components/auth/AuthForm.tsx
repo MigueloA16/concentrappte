@@ -89,13 +89,14 @@ export default function AuthForm({ view }: AuthFormProps) {
       const { error } = await supabase.auth.signInWithOAuth({
         provider,
         options: {
-          redirectTo: getURL() + 'auth/callback'
+          redirectTo: getURL() + 'dashboard'
         },
       });
 
       if (error) {
         throw error;
       }
+      
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Autenticación fallida");
     }

@@ -167,7 +167,6 @@ export default function TaskManager({ tasks: initialTasks = [], onTasksChanged }
       localStorage.removeItem('autoStartSession');
       
       // Then set our task and auto-start flag
-      console.log("Starting focus session for task:", task.name, task.id);
       localStorage.setItem('selectedTask', JSON.stringify(task));
       localStorage.setItem('autoStartSession', 'true');
       
