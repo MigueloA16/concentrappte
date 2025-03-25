@@ -2,13 +2,13 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/lib/supabase/client";
 import { toast } from "sonner";
-import { format, subDays, isToday, parseISO, isSameDay, addDays, startOfYear, eachDayOfInterval } from "date-fns";
+import { format, subDays, isToday, parseISO, startOfYear, eachDayOfInterval } from "date-fns";
 import { es } from "date-fns/locale";
 import RecentAchievements from "@/components/achievements/RecentAchievements";
 import { AchievementWithProgress } from "@/lib/supabase/database.types";
@@ -21,9 +21,7 @@ import {
   BarChart, 
   Target,
   Flame,
-  CheckCircle,
-  Award,
-  ChevronRight
+  Award
 } from "lucide-react";
 
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -337,7 +335,7 @@ export default function DashboardClient({
   const formatMinutes = (minutes) => {
     const hours = Math.floor(minutes / 60);
     const mins = minutes % 60;
-    return `${hours}h ${mins}m`;
+    return `${hours}h:${mins}m`;
   };
 
   // Calculate target hours progress
@@ -369,7 +367,7 @@ export default function DashboardClient({
                   </div>
                   <CardDescription className="text-gray-400">
                     {nextLevelInfo.name ? 
-                      `${formatMinutes(nextLevelInfo.minutesNeeded)} más para alcanzar ${nextLevelInfo.name}` : 
+                      `${formatMinutes(nextLevelInfo.minutesNeeded)} más para alcanzar el nivel ${nextLevelInfo.name}` : 
                       "¡Has alcanzado el nivel máximo!"
                     }
                   </CardDescription>
