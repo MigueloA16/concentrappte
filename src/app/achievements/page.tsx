@@ -1,25 +1,14 @@
-// src/app/dashboard/page.tsx
+// src/app/dashboard/achievements/page.tsx
 import { Suspense } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { getUserProfile } from "@/app/auth-check";
-import DashboardClient from "@/components/dashboard/DashboardClient";
+import AchievementsClient from "@/components/achievements/AchievementsClient";
 
 export const dynamic = 'force-dynamic';
 
-export default async function DashboardPage() {
+export default async function AchievementsPage() {
   const profile = await getUserProfile();
   const supabase = await createClient();
-
-  // Get recent sessions - order by end_time now
-  const { data: recentSessions } = await supabase
-    .from("focus_sessions")
-    .select(`
-    *,
-    task:task_id (id, name)
-  `)
-    .eq("user_id", profile?.id || '')
-    .order("end_time", { ascending: false })
-    .limit(5);
 
   // Get user achievements with their details
   const { data: userAchievements } = await supabase
@@ -47,11 +36,10 @@ export default async function DashboardPage() {
   })) || [];
 
   return (
-    <Suspense fallback={<div>Cargando...</div>}>
-      <DashboardClient
-        initialProfile={profile}
-        initialRecentSessions={recentSessions || []}
+    <Suspense fallback={<div>Cargando logros...</div>}>
+      <AchievementsClient 
         initialAchievements={achievementsWithProgress}
+        profile={profile}
       />
     </Suspense>
   );

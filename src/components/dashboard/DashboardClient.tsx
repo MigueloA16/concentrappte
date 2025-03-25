@@ -1,8 +1,11 @@
+// src/components/dashboard/DashboardClient.tsx
 "use client";
 
 import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { supabase } from "@/lib/supabase/client";
+import RecentAchievements from "@/components/achievements/RecentAchievements";
+import { AchievementWithProgress } from "@/lib/supabase/database.types";
 
 type Profile = {
   id: string;
@@ -27,14 +30,17 @@ type FocusSession = {
 interface DashboardClientProps {
   initialProfile: Profile;
   initialRecentSessions: FocusSession[];
+  initialAchievements?: AchievementWithProgress[];
 }
 
 export default function DashboardClient({ 
   initialProfile, 
-  initialRecentSessions 
+  initialRecentSessions,
+  initialAchievements = []
 }: DashboardClientProps) {
   const [profile, setProfile] = useState<Profile>(initialProfile);
   const [recentSessions, setRecentSessions] = useState<FocusSession[]>(initialRecentSessions || []);
+  const [achievements, setAchievements] = useState<AchievementWithProgress[]>(initialAchievements);
   const [loading, setLoading] = useState(false);
 
   // Format the date for display
@@ -80,7 +86,7 @@ export default function DashboardClient({
       const { data: { user } } = await supabase.auth.getUser();
 
       if (!user) {
-        throw new Error("User not authenticated");
+        throw new Error("Usuario no autenticado");
       }
 
       // Fetch user profile
@@ -107,6 +113,35 @@ export default function DashboardClient({
       if (sessionsError) throw sessionsError;
       setRecentSessions(sessions || []);
 
+      // Fetch achievements
+      const { data: userAchievements, error: achievementsError } = await supabase
+        .from("user_achievements")
+        .select(`
+          *,
+          achievement:achievement_id (
+            id,
+            name,
+            description,
+            icon_name,
+            category,
+            requirement_type,
+            requirement_value
+          )
+        `)
+        .eq("user_id", user.id);
+
+      if (achievementsError) throw achievementsError;
+      
+      // Format achievements
+      const achievementsWithProgress = userAchievements.map(ua => ({
+        ...ua.achievement,
+        progress: ua.progress,
+        unlocked: ua.unlocked,
+        unlocked_at: ua.unlocked_at
+      }));
+      
+      setAchievements(achievementsWithProgress);
+
     } catch (error) {
       console.error("Error refreshing dashboard data:", error);
     } finally {
@@ -116,7 +151,7 @@ export default function DashboardClient({
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
-      <h1 className="text-3xl font-bold text-white">Bienvenido, {profile?.username || 'User'}</h1>
+      <h1 className="text-3xl font-bold text-white">Bienvenido, {profile?.username || 'Usuario'}</h1>
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         <Card className="bg-[#1a1a2e] border-gray-800">
@@ -166,6 +201,10 @@ export default function DashboardClient({
             )}
           </CardContent>
         </Card>
+      </div>
+      
+      <div className="mt-6">
+        <RecentAchievements achievements={achievements} />
       </div>
 
       <div className="mt-8">

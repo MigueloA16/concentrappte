@@ -246,6 +246,67 @@ export interface Database {
           updated_at?: string | null
         }
       }
+      achievements: {
+        Row: {
+          id: string
+          name: string
+          description: string
+          icon_name: string
+          category: string
+          requirement_type: string
+          requirement_value: number
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          description: string
+          icon_name: string
+          category: string
+          requirement_type: string
+          requirement_value: number
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          description?: string
+          icon_name?: string
+          category?: string
+          requirement_type?: string
+          requirement_value?: number
+          created_at?: string
+        }
+      }
+      user_achievements: {
+        Row: {
+          id: string
+          user_id: string
+          achievement_id: string
+          progress: number
+          unlocked: boolean
+          unlocked_at: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          achievement_id: string
+          progress?: number
+          unlocked?: boolean
+          unlocked_at?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          achievement_id?: string
+          progress?: number
+          unlocked?: boolean
+          unlocked_at?: string | null
+          created_at?: string
+        }
+      }
     }
     Views: {
       [_ in never]: never
@@ -263,3 +324,16 @@ export interface Database {
     }
   }
 }
+
+// Achievement types for frontend use
+export type Achievement = Database['public']['Tables']['achievements']['Row'];
+export type UserAchievement = Database['public']['Tables']['user_achievements']['Row'] & {
+  achievement: Achievement
+};
+
+// Achievement with progress information
+export type AchievementWithProgress = Achievement & {
+  progress: number;
+  unlocked: boolean;
+  unlocked_at: string | null;
+};
