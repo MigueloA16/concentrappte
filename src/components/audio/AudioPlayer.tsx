@@ -22,25 +22,6 @@ interface YouTubePlayer {
   unMute: () => void;
 }
 
-interface Window {
-  YT?: {
-    Player: new (
-      elementId: string | HTMLElement,
-      options: {
-        height: string;
-        width: string;
-        videoId: string;
-        playerVars: Record<string, any>;
-        events: Record<string, any>;
-      }
-    ) => YouTubePlayer;
-    PlayerState: {
-      ENDED: number;
-    };
-  };
-  onYouTubeIframeAPIReady?: () => void;
-}
-
 // Define sound options
 const SOUND_OPTIONS = [
   { id: "firewood", name: "Firewood", type: "local", source: "/sounds/firewood.mp3" },
