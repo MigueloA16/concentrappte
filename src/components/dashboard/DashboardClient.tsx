@@ -1,7 +1,7 @@
 // src/components/dashboard/DashboardClient.tsx
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { supabase } from "@/lib/supabase/client";
 import RecentAchievements from "@/components/achievements/RecentAchievements";
@@ -108,39 +108,48 @@ export default function DashboardClient({
         `)
         .eq("user_id", user.id)
         .order("end_time", { ascending: false })
-        .limit(5);
+        .limit(3);
 
       if (sessionsError) throw sessionsError;
       setRecentSessions(sessions || []);
 
-      // Fetch achievements
+      // Fetch all achievements
+      const { data: allAchievements, error: allAchievementsError } = await supabase
+        .from("achievements")
+        .select("*");
+
+      if (allAchievementsError) throw allAchievementsError;
+
+      // Fetch user achievements progress
       const { data: userAchievements, error: achievementsError } = await supabase
         .from("user_achievements")
         .select(`
           *,
-          achievement:achievement_id (
-            id,
-            name,
-            description,
-            icon_name,
-            category,
-            requirement_type,
-            requirement_value
-          )
+          achievement:achievement_id (id)
         `)
         .eq("user_id", user.id);
 
       if (achievementsError) throw achievementsError;
       
-      // Format achievements
-      const achievementsWithProgress = userAchievements.map(ua => ({
-        ...ua.achievement,
-        progress: ua.progress,
-        unlocked: ua.unlocked,
-        unlocked_at: ua.unlocked_at
+      // Create a map of user achievements progress
+      const userProgressMap = new Map();
+      userAchievements.forEach(ua => {
+        userProgressMap.set(ua.achievement_id, {
+          progress: ua.progress,
+          unlocked: ua.unlocked,
+          unlocked_at: ua.unlocked_at
+        });
+      });
+      
+      // Format achievements with progress or default values
+      const formattedAchievements = allAchievements.map(achievement => ({
+        ...achievement,
+        progress: userProgressMap.get(achievement.id)?.progress || 0,
+        unlocked: userProgressMap.get(achievement.id)?.unlocked || false,
+        unlocked_at: userProgressMap.get(achievement.id)?.unlocked_at || null
       }));
       
-      setAchievements(achievementsWithProgress);
+      setAchievements(formattedAchievements);
 
     } catch (error) {
       console.error("Error refreshing dashboard data:", error);
@@ -177,7 +186,7 @@ export default function DashboardClient({
         <Card className="bg-[#1a1a2e] border-gray-800">
           <CardHeader className="pb-2">
             <CardTitle className="text-white">Sesiones Recientes</CardTitle>
-            <CardDescription className="text-gray-400">Tus últimas 5 sesiones de enfoque</CardDescription>
+            <CardDescription className="text-gray-400">Tus últimas 3 sesiones de enfoque</CardDescription>
           </CardHeader>
           <CardContent>
             {recentSessions && recentSessions.length > 0 ? (
