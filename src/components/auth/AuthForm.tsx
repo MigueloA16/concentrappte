@@ -21,6 +21,8 @@ export default function AuthForm({ view }: AuthFormProps) {
   const [username, setUsername] = useState("");
   const [loading, setLoading] = useState(false);
 
+  
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -64,12 +66,30 @@ export default function AuthForm({ view }: AuthFormProps) {
     }
   };
 
+  const getURL = (): string => {
+    // Set this to your site URL in production env
+    let url = 
+      process?.env?.NEXT_PUBLIC_SITE_URL ?? 
+      // Automatically set by Vercel
+      process?.env?.NEXT_PUBLIC_VERCEL_URL ?? 
+      // Fallback to localhost in development
+      'http://localhost:3000/';
+  
+    // Ensure the URL starts with http or https
+    url = url.startsWith('http') ? url : `https://${url}`;
+  
+    // Ensure the URL ends with a trailing slash
+    url = url.endsWith('/') ? url : `${url}/`;
+  
+    return url;
+  };
+  
   const handleOAuthSignIn = async (provider: 'github' | 'google') => {
     try {
       const { error } = await supabase.auth.signInWithOAuth({
         provider,
         options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
+          redirectTo: getURL() + 'auth/callback'
         },
       });
 
