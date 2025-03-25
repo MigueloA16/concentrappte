@@ -2,9 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Play,
   Pause,
@@ -25,6 +23,8 @@ import {
 } from "@/components/ui/dialog";
 import { supabase } from "@/lib/supabase/client";
 import { toast } from "sonner";
+import AudioPlayer from "@/components/audio/AudioPlayer";
+import CompactTaskSelection from "@/components/timer/CompactTaskSelection";
 
 type Task = {
   id: string;
@@ -63,6 +63,7 @@ export default function FocusTimer({
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const [startTime, setStartTime] = useState<Date | null>(null);
   const [currentTechniqueId, setCurrentTechniqueId] = useState(techniqueId);
+  const [loading, setLoading] = useState(false);
 
   // New states for the new features
   const [showBreakPrompt, setShowBreakPrompt] = useState(false);
@@ -303,24 +304,25 @@ export default function FocusTimer({
 
 
   const startTimer = async () => {
-    // If showing break prompt, don't start a new session
-    if (showBreakPrompt) {
-      return;
-    }
-
-    // If on a break, just start the timer without creating a session
-    if (isBreak) {
-      setIsActive(true);
-      return;
-    }
-
-    // Check if we need to select a task first
-    if (!selectedTaskId && !customTaskName.trim()) {
-      toast.error("Por favor, ingresa o selecciona una tarea");
-      return;
-    }
-
     try {
+      setLoading(true);
+      // If showing break prompt, don't start a new session
+      if (showBreakPrompt) {
+        return;
+      }
+
+      // If on a break, just start the timer without creating a session
+      if (isBreak) {
+        setIsActive(true);
+        return;
+      }
+
+      // Check if we need to select a task first
+      if (!selectedTaskId && !customTaskName.trim()) {
+        toast.error("Por favor, ingresa o selecciona una tarea");
+        return;
+      }
+
       // Get current user
       const { data: { user } } = await supabase.auth.getUser();
 
@@ -373,6 +375,8 @@ export default function FocusTimer({
     } catch (error) {
       console.error("Error al iniciar la sesión:", error);
       toast.error(error instanceof Error ? error.message : "Error al iniciar la sesión");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -460,6 +464,7 @@ export default function FocusTimer({
     if (!currentSessionId || isBreak) return;
 
     try {
+      setLoading(true);
       // Calculate the time spent so far
       const startTimeObj = startTime ? new Date(startTime) : null;
       if (!startTimeObj) {
@@ -512,6 +517,8 @@ export default function FocusTimer({
     } catch (error) {
       console.error("Error al finalizar la sesión:", error);
       toast.error(error instanceof Error ? error.message : "Error al finalizar la sesión");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -521,45 +528,6 @@ export default function FocusTimer({
     setSeconds(0);
     cleanupTimerState();
     toast.info("Temporizador reiniciado");
-  };
-
-  // Add a new helper function to start the timer with a task
-  const handleStartTimer = async (taskId: string) => {
-    if (!taskId) return;
-
-    try {
-      // Get current user
-      const { data: { user } } = await supabase.auth.getUser();
-
-      if (!user) {
-        throw new Error("Usuario no autenticado");
-      }
-
-      // Create a new focus session in Supabase
-      const now = new Date();
-      const { data, error } = await supabase
-        .from("focus_sessions")
-        .insert({
-          user_id: user.id,
-          task_id: taskId,
-          start_time: now.toISOString(),
-          is_completed: false,
-          technique_id: currentTechniqueId
-        })
-        .select()
-        .single();
-
-      if (error) throw error;
-
-      setCurrentSessionId(data.id);
-      setStartTime(now);
-      setIsActive(true);
-      setShowBreakPrompt(false);
-      toast.success("¡Sesión de enfoque iniciada!");
-    } catch (error) {
-      console.error("Error al iniciar la sesión:", error);
-      toast.error(error instanceof Error ? error.message : "Error al iniciar la sesión");
-    }
   };
 
   const handleSessionComplete = async () => {
@@ -602,195 +570,177 @@ export default function FocusTimer({
   };
 
   return (
-    <>
-      <Card className="w-full bg-[#1a1a2e] border-gray-800">
-        <CardHeader className="text-center">
-          <CardTitle className="text-white">
-            {isBreak ? "Descanso" : "Temporizador de Enfoque"}
-          </CardTitle>
-          <CardDescription className="text-sm text-purple-400">
-            {isBreak
-              ? `Toma un descanso y vuelve en ${defaultBreakLength} minutos`
-              : `${currentTask?.name ? currentTask?.name : 'Comienza tu sesión de enfoque para aumentar tu productividad'}`
-            }
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="flex flex-col items-center py-6">
-          {/* Timer Display */}
-          <div className="relative mb-8">
-            <div className="w-64 h-64 rounded-full border-4 border-gray-700 flex items-center justify-center">
-              <div className="w-60 h-60 rounded-full border border-purple-500/20 flex items-center justify-center relative">
-                {/* Progress circle */}
-                <svg className="absolute inset-0" width="240" height="240" viewBox="0 0 240 240">
-                  <circle
-                    cx="120"
-                    cy="120"
-                    r="112"
-                    fill="none"
-                    stroke={isBreak ? "#16a34a" : "#9333ea"}
-                    strokeWidth="4"
-                    strokeDasharray={`${704 * ((isBreak ? defaultBreakLength : defaultFocusTime) * 60 - (minutes * 60 + seconds)) / ((isBreak ? defaultBreakLength : defaultFocusTime) * 60)} 704`}
-                    transform="rotate(-90 120 120)"
-                  />
-                </svg>
-
-                <div className="text-center">
-                  <div className="text-5xl font-mono font-bold">
-                    {String(minutes).padStart(2, "0")}:{String(seconds).padStart(2, "0")}
-                  </div>
-                  <div className="text-xs text-gray-400 mt-2">
-                    {isBreak ? "Descanso" : "Sesión de Enfoque"}
-                  </div>
-                  {!isBreak && (
-                    <div className="mt-2 text-sm text-purple-400">
-                      Sesión {sessionCount + 1} de {defaultTargetSessions}
-                    </div>
-                  )}
-                  {currentTask && (
-                    <div className="mt-2 text-sm text-blue-400">
-                      {currentTask.name}
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* Session counters */}
-            <div className="flex justify-center mt-4 space-x-2">
-              {Array.from({ length: defaultTargetSessions }).map((_, index) => (
-                <div
-                  key={index}
-                  className={`w-3 h-3 rounded-full ${index < sessionCount
-                    ? 'bg-purple-600'
-                    : index === sessionCount && !isBreak
-                      ? 'bg-purple-400 animate-pulse'
-                      : 'bg-gray-700'
-                    }`}
+    <Card className="w-full bg-[#1a1a2e] border-gray-800">
+      <CardHeader className="text-center">
+        <CardTitle className="text-white">
+          {isBreak ? "Descanso" : "Temporizador de Enfoque"}
+        </CardTitle>
+        <CardDescription className="text-sm text-purple-400">
+          {isBreak
+            ? `Toma un descanso y vuelve en ${defaultBreakLength} minutos`
+            : `${currentTask?.name ? currentTask?.name : 'Comienza tu sesión de enfoque para aumentar tu productividad'}`
+          }
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="flex flex-col items-center py-6">
+        {/* Timer Display */}
+        <div className="relative mb-6">
+          <div className="w-64 h-64 rounded-full border-4 border-gray-700 flex items-center justify-center">
+            <div className="w-60 h-60 rounded-full border border-purple-500/20 flex items-center justify-center relative">
+              {/* Progress circle */}
+              <svg className="absolute inset-0" width="240" height="240" viewBox="0 0 240 240">
+                <circle
+                  cx="120"
+                  cy="120"
+                  r="112"
+                  fill="none"
+                  stroke={isBreak ? "#16a34a" : "#9333ea"}
+                  strokeWidth="4"
+                  strokeDasharray={`${704 * ((isBreak ? defaultBreakLength : defaultFocusTime) * 60 - (minutes * 60 + seconds)) / ((isBreak ? defaultBreakLength : defaultFocusTime) * 60)} 704`}
+                  transform="rotate(-90 120 120)"
                 />
-              ))}
+              </svg>
+
+              <div className="text-center">
+                <div className="text-5xl font-mono font-bold">
+                  {String(minutes).padStart(2, "0")}:{String(seconds).padStart(2, "0")}
+                </div>
+                <div className="text-xs text-gray-400 mt-2">
+                  {isBreak ? "Descanso" : "Sesión de Enfoque"}
+                </div>
+                {!isBreak && (
+                  <div className="mt-2 text-sm text-purple-400">
+                    Sesión {sessionCount + 1} de {defaultTargetSessions}
+                  </div>
+                )}
+                {currentTask && (
+                  <div className="mt-2 text-sm text-blue-400">
+                    {currentTask.name}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-4 w-full max-w-xs">
-            {/* Task Selection - Only show when not in active mode and not during break */}
-            {!isActive && !isBreak && !showBreakPrompt && (
-              <>
-                <p className="text-base">Selecciona una tarea</p>
-                {recentTasks.length > 0 ? (
-                  <Select
-                    value={selectedTaskId || undefined}
-                    onValueChange={(value) => {
-                      if (value === "new-task") {
-                        setSelectedTaskId(null);
-                        setCustomTaskName("");
-                      } else {
-                        setSelectedTaskId(value);
-                        if (value) setCustomTaskName("");
-                      }
-                    }}
-                  >
-                    <SelectTrigger className="bg-[#262638] border-gray-700 text-white">
-                      <SelectValue placeholder="¿En qué quieres trabajar?" />
-                    </SelectTrigger>
-                    <SelectContent className="bg-[#262638] border-gray-700 text-white">
-                      <SelectItem value="new-task">Nueva tarea...</SelectItem>
-                      {recentTasks
-                        .filter(task => task.status !== "completed") // Filter out completed tasks
-                        .map((task) => (
-                          <SelectItem key={task.id} value={task.id}>{task.name}</SelectItem>
-                        ))}
-                    </SelectContent>
-                  </Select>
-                ) : null}
-                {(selectedTaskId === null || !recentTasks.filter(task => task.status !== "completed").length) && (
-                  <Input
-                    placeholder="¿En qué estás trabajando?"
-                    value={customTaskName}
-                    onChange={(e) => {
-                      setCustomTaskName(e.target.value);
-                      setSelectedTaskId(null);
-                    }}
-                    className="bg-[#262638] border-gray-700 text-white placeholder:text-gray-500"
-                  />
-                )}
-              </>
-            )}
+          {/* Session counters */}
+          <div className="flex justify-center mt-4 space-x-2">
+            {Array.from({ length: defaultTargetSessions }).map((_, index) => (
+              <div
+                key={index}
+                className={`w-3 h-3 rounded-full ${index < sessionCount
+                  ? 'bg-purple-600'
+                  : index === sessionCount && !isBreak
+                    ? 'bg-purple-400 animate-pulse'
+                    : 'bg-gray-700'
+                  }`}
+              />
+            ))}
+          </div>
+        </div>
 
-            {/* Break Prompt - show when a focus session just ended */}
-            {showBreakPrompt && (
-              <div className="space-y-4 bg-[#262638] p-4 rounded-lg border border-gray-700">
-                <div className="text-center">
-                  <h3 className="text-base text-white mb-2">¡Sesión completada!</h3>
-                  <p className="text-gray-300 text-xs">Tu sesión de enfoque ha terminado. ¿Qué te gustaría hacer?</p>
-                </div>
-                <div className="flex flex-col space-y-2">
-                  <Button
-                    onClick={startBreak}
-                    size="sm"
-                    className="bg-purple-600 hover:bg-purple-700 text-xs"
-                  >
-                    <Coffee className="h-4 w-4 mr-2" />
-                    Comenzar Descanso
-                  </Button>
-                  <Button
-                    variant="outline"
-                    onClick={skipBreak}
-                    size="sm"
-                    className="border-gray-600 text-xs"
-                  >
-                    <RotateCcw className="h-4 w-4 mr-2" />
-                    Omitir Descanso
-                  </Button>
-                </div>
+        <div className="w-full max-w-sm mb-4">
+          {/* Compact Task Selection - Only show when not in active mode and not during break */}
+          {!isActive && !isBreak && !showBreakPrompt && (
+            <CompactTaskSelection
+              recentTasks={recentTasks}
+              selectedTaskId={selectedTaskId}
+              customTaskName={customTaskName}
+              setSelectedTaskId={setSelectedTaskId}
+              setCustomTaskName={setCustomTaskName}
+              setCurrentTask={setCurrentTask}
+              disabled={loading}
+            />
+          )}
+
+          {/* Break Prompt - show when a focus session just ended */}
+          {showBreakPrompt && (
+            <div className="mb-4 space-y-4 bg-[#262638] p-4 rounded-lg border border-gray-700">
+              <div className="text-center">
+                <h3 className="text-base text-white mb-2">¡Sesión completada!</h3>
+                <p className="text-gray-300 text-xs">Tu sesión de enfoque ha terminado. ¿Qué te gustaría hacer?</p>
               </div>
-            )}
-
-            {/* Regular Timer controls - don't show during break prompt */}
-            {!showBreakPrompt && (
-              <div className="flex space-x-2">
-                {!isActive ? (
-                  <Button
-                    className="flex-1 bg-purple-600 hover:bg-purple-700"
-                    onClick={startTimer}
-                  >
-                    <Play className="h-4 w-4 mr-2" />
-                    {isBreak ? "Continuar Descanso" : "Comenzar"}
-                  </Button>
-                ) : (
-                  <Button
-                    variant="outline"
-                    onClick={pauseTimer}
-                    className="flex-1 border-purple-700 text-purple-400 hover:bg-purple-900/20"
-                  >
-                    <Pause className="h-4 w-4 mr-2" />
-                    Pausar
-                  </Button>
-                )}
+              <div className="flex flex-col space-y-2">
+                <Button
+                  onClick={startBreak}
+                  className="bg-purple-600 hover:bg-purple-700 text-xs"
+                >
+                  <Coffee className="h-4 w-4 mr-2" />
+                  Comenzar Descanso
+                </Button>
                 <Button
                   variant="outline"
-                  onClick={resetTimer}
-                  className="border-gray-700 text-gray-400 hover:bg-gray-800 hover:text-white"
+                  onClick={skipBreak}
+                  className="border-gray-600 text-xs"
                 >
-                  <RotateCcw className="h-4 w-4" />
-                  <span className="sr-only">Reiniciar</span>
+                  <RotateCcw className="h-4 w-4 mr-2" />
+                  Omitir Descanso
                 </Button>
               </div>
-            )}
+            </div>
+          )}
 
-            {/* Finish early button - only show during active focus session */}
-            {isActive && !isBreak && (
-              <Button
-                variant="outline"
-                onClick={finishEarly}
-                className="border-green-700 text-green-400 hover:bg-green-900/20 mt-2"
-              >
-                <StopCircle className="h-4 w-4 mr-2" />
-                Finalizar ahora
-              </Button>
+          {/* Controls Container */}
+          <div className="flex justify-center w-full max-w-sm mx-auto">
+            {/* Regular Timer controls - don't show during break prompt */}
+            {!showBreakPrompt && (
+              <div className={`flex gap-4 justify-center w-full`}>
+                {!isActive ? (
+                  <>
+                    <Button
+                      className="bg-purple-600 hover:bg-purple-700 px-6 py-1 h-10"
+                      onClick={startTimer}
+                      disabled={(!selectedTaskId && !customTaskName.trim()) || loading}
+                    >
+                      <Play className="h-4 w-4 mr-2" />
+                      <span className="text-sm">Comenzar</span>
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={resetTimer}
+                      className="border-gray-700 text-gray-400 hover:bg-gray-800 hover:text-white p-0 w-10 h-10"
+                    >
+                      <RotateCcw className="h-4 w-4" />
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <Button
+                      variant="outline"
+                      onClick={pauseTimer}
+                      className="border-purple-700 text-purple-400 hover:bg-purple-900/20 px-6 py-1 h-10"
+                    >
+                      <Pause className="h-4 w-4 mr-2" />
+                      <span className="text-sm">Pausar</span>
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={resetTimer}
+                      className="border-gray-700 text-gray-400 hover:bg-gray-800 hover:text-white p-0 w-10 h-10"
+                    >
+                      <RotateCcw className="h-4 w-4" />
+                    </Button>
+                    
+                    {/* Finish early button - only show during active focus session */}
+                    {!isBreak && (
+                      <Button
+                        variant="outline"
+                        onClick={finishEarly}
+                        className="border-green-700 text-green-400 hover:bg-green-900/20 px-6 py-1 h-10"
+                      >
+                        <StopCircle className="h-4 w-4 mr-2" />
+                        <span className="text-sm">Finalizar</span>
+                      </Button>
+                    )}
+                  </>
+                )}
+              </div>
             )}
           </div>
-        </CardContent>
-      </Card>
+        </div>
+        
+        {/* Add the AudioPlayer component below all timer controls */}
+        <AudioPlayer />
+      </CardContent>
 
       {/* Task Complete Dialog */}
       <Dialog open={showTaskCompleteDialog} onOpenChange={setShowTaskCompleteDialog}>
@@ -835,6 +785,6 @@ export default function FocusTimer({
           )}
         </DialogContent>
       </Dialog>
-    </>
+    </Card>
   );
 }
