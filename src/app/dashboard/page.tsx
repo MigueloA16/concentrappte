@@ -19,7 +19,12 @@ export default async function DashboardPage() {
   `)
     .eq("user_id", profile?.id || '')
     .order("end_time", { ascending: false })
-    .limit(5);
+    .limit(3);
+
+  // Get ALL achievements
+  const { data: allAchievements } = await supabase
+    .from("achievements")
+    .select("*");
 
   // Get user achievements with their details
   const { data: userAchievements } = await supabase
@@ -38,13 +43,27 @@ export default async function DashboardPage() {
     `)
     .eq("user_id", profile?.id || '');
 
-  // Format achievements for the client component
-  const achievementsWithProgress = userAchievements?.map(ua => ({
-    ...ua.achievement,
-    progress: ua.progress,
-    unlocked: ua.unlocked,
-    unlocked_at: ua.unlocked_at
-  })) || [];
+  // Create a map of user's achievements by achievement_id
+  const userAchievementsMap = new Map();
+  userAchievements?.forEach(ua => {
+    userAchievementsMap.set(ua.achievement_id, {
+      progress: ua.progress,
+      unlocked: ua.unlocked,
+      unlocked_at: ua.unlocked_at
+    });
+  });
+
+  // Format achievements for the client component, including ALL achievements
+  const achievementsWithProgress = allAchievements?.map(achievement => {
+    const userProgress = userAchievementsMap.get(achievement.id);
+    
+    return {
+      ...achievement,
+      progress: userProgress?.progress || 0,
+      unlocked: userProgress?.unlocked || false,
+      unlocked_at: userProgress?.unlocked_at || null
+    };
+  }) || [];
 
   return (
     <Suspense fallback={<div>Cargando...</div>}>

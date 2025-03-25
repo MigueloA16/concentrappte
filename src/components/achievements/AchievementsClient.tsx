@@ -55,30 +55,40 @@ export default function AchievementsClient({
         throw new Error("Usuario no autenticado");
       }
 
-      const { data: userAchievements, error } = await supabase
+      // First, get all achievements
+      const { data: allAchievements, error: achievementsError } = await supabase
+        .from("achievements")
+        .select("*");
+
+      if (achievementsError) throw achievementsError;
+
+      // Then get user's achievements progress
+      const { data: userAchievements, error: userAchievementsError } = await supabase
         .from("user_achievements")
         .select(`
           *,
-          achievement:achievement_id (
-            id,
-            name,
-            description,
-            icon_name,
-            category,
-            requirement_type,
-            requirement_value
-          )
+          achievement:achievement_id (id)
         `)
         .eq("user_id", user.id);
 
-      if (error) throw error;
+      if (userAchievementsError) throw userAchievementsError;
 
-      // Format achievements
-      const formattedAchievements = userAchievements.map(ua => ({
-        ...ua.achievement,
-        progress: ua.progress,
-        unlocked: ua.unlocked,
-        unlocked_at: ua.unlocked_at
+      // Create a map of user's achievements progress
+      const userProgressMap = new Map();
+      userAchievements.forEach(ua => {
+        userProgressMap.set(ua.achievement_id, {
+          progress: ua.progress,
+          unlocked: ua.unlocked,
+          unlocked_at: ua.unlocked_at
+        });
+      });
+
+      // Combine all achievements with user progress
+      const formattedAchievements = allAchievements.map(achievement => ({
+        ...achievement,
+        progress: userProgressMap.get(achievement.id)?.progress || 0,
+        unlocked: userProgressMap.get(achievement.id)?.unlocked || false,
+        unlocked_at: userProgressMap.get(achievement.id)?.unlocked_at || null
       }));
 
       setAchievements(formattedAchievements);

@@ -9,7 +9,7 @@ import {
   Users, 
   Settings, 
   Play,
-  Menu
+  Trophy
 } from "lucide-react";
 import { useState, useEffect } from "react";
 
@@ -24,6 +24,11 @@ const navItems = [
     href: "/hub",
     icon: Clock,
   },
+  {
+    label: "Logros",
+    href: "/achievements",
+    icon: Trophy,
+  },  
   {
     label: "Grupos de Estudio",
     href: "/rooms",

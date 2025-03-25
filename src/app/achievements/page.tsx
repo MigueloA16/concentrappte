@@ -1,4 +1,4 @@
-// src/app/dashboard/achievements/page.tsx
+// src/app/achievements/page.tsx
 import { Suspense } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { getUserProfile } from "@/app/auth-check";
@@ -10,7 +10,12 @@ export default async function AchievementsPage() {
   const profile = await getUserProfile();
   const supabase = await createClient();
 
-  // Get user achievements with their details
+  // Get ALL achievements from the achievements table
+  const { data: allAchievements } = await supabase
+    .from("achievements")
+    .select("*");
+
+  // Get user's achievement progress
   const { data: userAchievements } = await supabase
     .from("user_achievements")
     .select(`
@@ -27,13 +32,27 @@ export default async function AchievementsPage() {
     `)
     .eq("user_id", profile?.id || '');
 
-  // Format achievements for the client component
-  const achievementsWithProgress = userAchievements?.map(ua => ({
-    ...ua.achievement,
-    progress: ua.progress,
-    unlocked: ua.unlocked,
-    unlocked_at: ua.unlocked_at
-  })) || [];
+  // Create a map of the user's achievements by achievement_id
+  const userAchievementsMap = new Map();
+  userAchievements?.forEach(ua => {
+    userAchievementsMap.set(ua.achievement_id, {
+      progress: ua.progress,
+      unlocked: ua.unlocked,
+      unlocked_at: ua.unlocked_at
+    });
+  });
+
+  // Format achievements with progress (or default values for those not yet started)
+  const achievementsWithProgress = allAchievements?.map(achievement => {
+    const userProgress = userAchievementsMap.get(achievement.id);
+    
+    return {
+      ...achievement,
+      progress: userProgress?.progress || 0,
+      unlocked: userProgress?.unlocked || false,
+      unlocked_at: userProgress?.unlocked_at || null
+    };
+  }) || [];
 
   return (
     <Suspense fallback={<div>Cargando logros...</div>}>

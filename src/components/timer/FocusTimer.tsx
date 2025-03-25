@@ -604,14 +604,14 @@ export default function FocusTimer({
   return (
     <>
       <Card className="w-full bg-[#1a1a2e] border-gray-800">
-        <CardHeader>
+        <CardHeader className="text-center">
           <CardTitle className="text-white">
             {isBreak ? "Descanso" : "Temporizador de Enfoque"}
           </CardTitle>
-          <CardDescription className="text-gray-400">
+          <CardDescription className="text-sm text-purple-400">
             {isBreak
               ? `Toma un descanso y vuelve en ${defaultBreakLength} minutos`
-              : `${currentTask?.name ? 'Tarea : ' + currentTask?.name : 'Comienza tu sesión de enfoque para aumentar tu productividad'}`
+              : `${currentTask?.name ? currentTask?.name : 'Comienza tu sesión de enfoque para aumentar tu productividad'}`
             }
           </CardDescription>
         </CardHeader>
