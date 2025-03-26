@@ -198,6 +198,95 @@ export default function TaskManager({ tasks: initialTasks = [], onTasksChanged }
     }
   }, [initialTasks, currentPage]);
 
+  useEffect(() => {
+    const checkForStatusChanges = async () => {
+      // Only run if we have tasks loaded and a user is logged in
+      if (tasks.length === 0) return;
+      
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+        
+        // Get IDs of current tasks to check for updates
+        const taskIds = tasks.map(task => task.id);
+        
+        // Fetch latest status for these tasks
+        const { data, error } = await supabase
+          .from("tasks")
+          .select("id, status, updated_at")
+          .in("id", taskIds);
+          
+        if (error) throw error;
+        
+        // Check if any statuses have changed
+        let hasChanges = false;
+        const updatedTasks = [...tasks];
+        
+        for (let i = 0; i < updatedTasks.length; i++) {
+          const serverTask = data.find(t => t.id === updatedTasks[i].id);
+          if (serverTask && updatedTasks[i].status !== serverTask.status) {
+            updatedTasks[i].status = serverTask.status;
+            updatedTasks[i].updated_at = serverTask.updated_at;
+            hasChanges = true;
+          }
+        }
+        
+        // If we found changes, update the tasks and resort
+        if (hasChanges) {
+          // Resort by status priority
+          const sortedTasks = updatedTasks.sort((a, b) => {
+            const statusOrder = { 'in_progress': 0, 'pending': 1, 'completed': 2 };
+            return statusOrder[a.status] - statusOrder[b.status];
+          });
+          
+          setTasks(sortedTasks);
+          
+          // Also refresh the task counts
+          await refreshTaskCounts(user.id);
+        }
+      } catch (error) {
+        console.error("Error checking for task status changes:", error);
+      }
+    };
+  
+    // Run immediately and then every 3 seconds
+    checkForStatusChanges();
+    const intervalId = setInterval(checkForStatusChanges, 3000);
+    
+    return () => clearInterval(intervalId);
+  }, [tasks]); // Depends on tasks array
+
+  const refreshTaskCounts = async (userId: string) => {
+    try {
+      // Get counts by status
+      const { data, error } = await supabase
+        .from("tasks")
+        .select("status")
+        .eq("user_id", userId)
+        .eq("deleted", false);
+  
+      if (error) throw error;
+  
+      // Count tasks by status
+      const counts = {
+        in_progress: 0,
+        pending: 0,
+        completed: 0
+      };
+  
+      data.forEach(task => {
+        if (task.status in counts) {
+          counts[task.status]++;
+        }
+      });
+  
+      setTaskCounts(counts);
+      setTotalTasks(data.length);
+    } catch (error) {
+      console.error("Error refreshing task counts:", error);
+    }
+  };
+
   const createTask = async () => {
     if (!newTaskName.trim()) {
       toast.error("Por favor ingresa un nombre para la tarea");
@@ -369,19 +458,60 @@ export default function TaskManager({ tasks: initialTasks = [], onTasksChanged }
     }
   };
 
-  const startFocusSession = (task: Task) => {
+  const startFocusSession = async (task: Task) => {
     try {
-      // First clear all existing timers and flags
+      // First update the task to in_progress status
+      if (task.status !== "in_progress") {
+        const { error } = await supabase
+          .from("tasks")
+          .update({ 
+            status: "in_progress",
+            updated_at: new Date().toISOString()
+          })
+          .eq("id", task.id);
+        
+        if (error) throw error;
+        
+        // Update local state
+        const updatedTasks = tasks.map(t => 
+          t.id === task.id ? { ...t, status: "in_progress", updated_at: new Date().toISOString() } : t
+        );
+        
+        // Sort tasks after status change
+        const sortedTasks = updatedTasks.sort((a, b) => {
+          const statusOrder = { 'in_progress': 0, 'pending': 1, 'completed': 2 };
+          return statusOrder[a.status] - statusOrder[b.status];
+        });
+        
+        setTasks(sortedTasks);
+        
+        // Update task counts
+        setTaskCounts(prev => ({
+          ...prev,
+          [task.status]: prev[task.status] - 1,
+          in_progress: prev.in_progress + 1
+        }));
+        
+        // Update the task object to have in_progress status
+        task = { ...task, status: "in_progress" };
+      }
+      
+      // Clear all existing timers and flags
       localStorage.removeItem('timerState');
       localStorage.removeItem('selectedTask');
       localStorage.removeItem('autoStartSession');
       
-      // Then set our task and auto-start flag
+      // Then set our updated task and auto-start flag
       localStorage.setItem('selectedTask', JSON.stringify(task));
       localStorage.setItem('autoStartSession', 'true');
       
       // Notify the user
       toast.info(`Preparando sesión de enfoque para: ${task.name}`);
+      
+      // Notify parent component
+      if (onTasksChanged) {
+        onTasksChanged();
+      }
       
       // Add a slight delay before navigation to ensure localStorage is set
       setTimeout(() => {
