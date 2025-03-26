@@ -44,32 +44,70 @@ export async function getUserProfile() {
       
       console.log('Creating new profile for:', username, 'Avatar:', avatarUrl);
       
-      const { data: newProfile, error: insertError } = await supabase
-        .from('profiles')
-        .insert({
-          id: user.id,
-          username: username,
-          avatar_url: avatarUrl,
-          total_focus_time: 0,
-          streak_days: 0,
-          best_streak: 0,
-          daily_motivation: "Focus on the process, not just the outcome",
-          target_hours: 100,
-          level_name: "Bronce"
-        })
-        .select('*')
-        .single()
+      // Add retry logic to handle potential race conditions
+      let retries = 3;
+      let newProfile = null;
       
-      if (insertError) {
-        console.error('Error creating user profile:', insertError)
-        throw insertError
+      while (retries > 0 && !newProfile) {
+        try {
+          const { data, error: insertError } = await supabase
+            .from('profiles')
+            .insert({
+              id: user.id,
+              username: username,
+              avatar_url: avatarUrl,
+              total_focus_time: 0,
+              streak_days: 0,
+              best_streak: 0,
+              daily_motivation: "Focus on the process, not just the outcome",
+              target_hours: 100,
+              level_name: "Bronce"
+            })
+            .select('*')
+            .single()
+          
+          if (insertError) {
+            // If there's a conflict (profile was created by another concurrent process)
+            // Try to fetch it instead
+            if (insertError.code === '23505') { // Unique violation
+              const { data: existingProfile } = await supabase
+                .from('profiles')
+                .select('*')
+                .eq('id', user.id)
+                .single()
+              
+              if (existingProfile) {
+                return existingProfile;
+              }
+            }
+            
+            throw insertError;
+          }
+          
+          newProfile = data;
+        } catch (error) {
+          console.error(`Error creating profile (attempt ${4-retries}/3):`, error);
+          retries--;
+          
+          if (retries > 0) {
+            // Wait a bit before retrying
+            await new Promise(resolve => setTimeout(resolve, 500));
+          }
+        }
       }
       
-      return newProfile
+      if (newProfile) {
+        return newProfile;
+      } else {
+        console.error('Failed to create user profile after multiple attempts');
+      }
     }
     
     // Handle existing profile with missing fields
-    if (profile.best_streak === null || profile.best_streak === undefined) {
+    if (profile && (profile.best_streak === null || profile.best_streak === undefined || 
+                   profile.daily_motivation === null || profile.target_hours === null)) {
+      console.log('Updating profile with missing fields');
+      
       const { data: updatedProfile, error: updateError } = await supabase
         .from('profiles')
         .update({ 
@@ -113,8 +151,11 @@ function extractUsername(user) {
   } 
   else if (provider === 'google') {
     // Google-specific username extraction
-    // Google often provides full name but not a distinct username
-    const fullName = user.user_metadata?.full_name || user.user_metadata?.name;
+    // First check for name fields
+    const fullName = user.user_metadata?.full_name || 
+                     user.user_metadata?.name || 
+                     user.user_metadata?.given_name;
+    
     if (fullName) {
       // Create a username from the first name or first part of full name
       const nameParts = fullName.split(' ');
@@ -122,7 +163,16 @@ function extractUsername(user) {
         return nameParts[0]; // Use first name as username
       }
     }
-    return user.email?.split('@')[0] || 'Google User';
+    
+    // If no name is available, check for email
+    if (user.email) {
+      return user.email.split('@')[0];
+    }
+    
+    // Log what we received from Google to help with debugging
+    console.log('Google user metadata:', user.user_metadata);
+    
+    return 'Google User';
   }
   
   // Default/Email user extraction
@@ -133,7 +183,10 @@ function extractUsername(user) {
 
 // Helper function to extract avatar URL from various auth providers
 function extractAvatarUrl(user) {
+  // Added more possible fields where the avatar URL might be
   return user.user_metadata?.avatar_url || 
-         user.user_metadata?.picture || // Some providers use 'picture'
+         user.user_metadata?.picture || // Google often uses 'picture'
+         user.user_metadata?.avatar ||
+         user.user_metadata?.photoURL ||
          null;
 }

@@ -32,34 +32,33 @@ export async function updateSession(request: NextRequest) {
   // issues with users being randomly logged out.
 
   // IMPORTANT: DO NOT REMOVE auth.getUser()
-
   const {
     data: { user },
   } = await supabase.auth.getUser()
 
-  if (
-    !user &&
-    !request.nextUrl.pathname.startsWith('/login') &&
-    !request.nextUrl.pathname.startsWith('/auth')
-  ) {
-    // no user, potentially respond by redirecting the user to the login page
-    const url = request.nextUrl.clone()
-    url.pathname = '/login'
+  // Allow access to auth pages (sign-in, sign-up, verify, etc.)
+  // Add callback route to the allowed paths
+  const authPaths = ['/auth/sign-in', '/auth/sign-up', '/auth/verify', '/auth/callback']
+  const isAuthPath = authPaths.some(path => request.nextUrl.pathname.startsWith(path))
+  
+  // Also allow access to the home page
+  const isHomePage = request.nextUrl.pathname === '/'
+  
+  // Allow access to API routes
+  const isApiRoute = request.nextUrl.pathname.startsWith('/api/')
+  
+  if (!user && !isAuthPath && !isHomePage && !isApiRoute) {
+    // No user, redirect to the sign-in page with a return URL
+    const returnUrl = encodeURIComponent(request.nextUrl.pathname)
+    const url = new URL('/auth/sign-in', request.url)
+    url.searchParams.set('returnUrl', returnUrl)
     return NextResponse.redirect(url)
   }
-
-  // IMPORTANT: You *must* return the supabaseResponse object as it is.
-  // If you're creating a new response object with NextResponse.next() make sure to:
-  // 1. Pass the request in it, like so:
-  //    const myNewResponse = NextResponse.next({ request })
-  // 2. Copy over the cookies, like so:
-  //    myNewResponse.cookies.setAll(supabaseResponse.cookies.getAll())
-  // 3. Change the myNewResponse object to fit your needs, but avoid changing
-  //    the cookies!
-  // 4. Finally:
-  //    return myNewResponse
-  // If this is not done, you may be causing the browser and server to go out
-  // of sync and terminate the user's session prematurely!
+  
+  // If user is authenticated and tries to access auth pages, redirect to dashboard
+  if (user && isAuthPath && !request.nextUrl.pathname.startsWith('/auth/callback')) {
+    return NextResponse.redirect(new URL('/dashboard', request.url))
+  }
 
   return supabaseResponse
 }
