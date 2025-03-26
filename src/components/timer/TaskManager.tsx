@@ -1,3 +1,5 @@
+// src/components/timer/TaskManager.tsx - with sorting by status and duration display
+
 "use client";
 
 import { useState, useEffect } from "react";
@@ -20,7 +22,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
-import { Play, MoreVertical, Check, Clock, LayoutGrid, Trash, CheckCircle2, XCircle, ChevronLeft, ChevronRight } from "lucide-react";
+import { Play, MoreVertical, Check, Clock, LayoutGrid, Trash, CheckCircle2, XCircle, ChevronLeft, ChevronRight, AlertCircle } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
@@ -34,6 +36,7 @@ type Task = {
   duration_minutes?: number;
   created_at: string;
   updated_at: string;
+  completed_at?: string;
   deleted?: boolean;
 };
 
@@ -53,14 +56,21 @@ export default function TaskManager({ tasks: initialTasks = [], onTasksChanged }
   const [currentPage, setCurrentPage] = useState(1);
   const [totalTasks, setTotalTasks] = useState(0);
   const tasksPerPage = 5;
+  // Count by status
+  const [taskCounts, setTaskCounts] = useState({
+    in_progress: 0,
+    pending: 0,
+    completed: 0
+  });
 
-  // Get total task count on initial load
+  // Get total task count on initial load and counts by status
   useEffect(() => {
     const fetchTaskCount = async () => {
       try {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
 
+        // Get total count
         const { count, error } = await supabase
           .from("tasks")
           .select("*", { count: 'exact', head: true })
@@ -69,6 +79,30 @@ export default function TaskManager({ tasks: initialTasks = [], onTasksChanged }
 
         if (error) throw error;
         setTotalTasks(count || 0);
+
+        // Get counts by status
+        const { data: statusData, error: statusError } = await supabase
+          .from("tasks")
+          .select("status")
+          .eq("user_id", user.id)
+          .eq("deleted", false);
+
+        if (statusError) throw statusError;
+
+        // Count tasks by status
+        const counts = {
+          in_progress: 0,
+          pending: 0,
+          completed: 0
+        };
+
+        statusData.forEach(task => {
+          if (task.status in counts) {
+            counts[task.status]++;
+          }
+        });
+
+        setTaskCounts(counts);
       } catch (error) {
         console.error("Error fetching task count:", error);
       }
@@ -77,7 +111,7 @@ export default function TaskManager({ tasks: initialTasks = [], onTasksChanged }
     fetchTaskCount();
   }, []);
 
-  // Fetch tasks based on current page
+  // Fetch tasks based on current page with priority ordering
   const fetchTasks = async (page = 1) => {
     try {
       setLoading(true);
@@ -87,17 +121,43 @@ export default function TaskManager({ tasks: initialTasks = [], onTasksChanged }
       // Calculate offset for pagination
       const offset = (page - 1) * tasksPerPage;
 
+      // Get all tasks sorted by status priority (in_progress, pending, completed) and then by creation date
       const { data, error } = await supabase
         .from("tasks")
         .select("*")
         .eq("user_id", user.id)
         .eq("deleted", false)
-        .order("created_at", { ascending: false })
-        .range(offset, offset + tasksPerPage - 1);
+        .order("status", { ascending: true, nullsFirst: false }) // Custom ordering will be applied in JS
+        .order("created_at", { ascending: false });
 
       if (error) throw error;
-      setTasks(data || []);
+
+      // Custom sort function to prioritize: in_progress > pending > completed
+      const sortedData = [...(data || [])].sort((a, b) => {
+        const statusOrder = { 'in_progress': 0, 'pending': 1, 'completed': 2 };
+        return statusOrder[a.status] - statusOrder[b.status];
+      });
+
+      // Apply pagination
+      const paginatedData = sortedData.slice(offset, offset + tasksPerPage);
+      
+      setTasks(paginatedData);
       setCurrentPage(page);
+      
+      // Update task counts
+      const counts = {
+        in_progress: 0,
+        pending: 0,
+        completed: 0
+      };
+
+      data.forEach(task => {
+        if (task.status in counts) {
+          counts[task.status]++;
+        }
+      });
+      
+      setTaskCounts(counts);
     } catch (error) {
       console.error("Error fetching tasks:", error);
       toast.error("Error fetching tasks");
@@ -114,7 +174,27 @@ export default function TaskManager({ tasks: initialTasks = [], onTasksChanged }
   // Keep tasks in sync with initialTasks prop for the first page
   useEffect(() => {
     if (currentPage === 1) {
-      setTasks(initialTasks);
+      const sortedInitialTasks = [...initialTasks].sort((a, b) => {
+        const statusOrder = { 'in_progress': 0, 'pending': 1, 'completed': 2 };
+        return statusOrder[a.status] - statusOrder[b.status];
+      });
+      
+      setTasks(sortedInitialTasks);
+
+      // Update task counts from initial tasks
+      const counts = {
+        in_progress: 0,
+        pending: 0,
+        completed: 0
+      };
+
+      initialTasks.forEach(task => {
+        if (task.status in counts) {
+          counts[task.status]++;
+        }
+      });
+      
+      setTaskCounts(counts);
     }
   }, [initialTasks, currentPage]);
 
@@ -144,14 +224,24 @@ export default function TaskManager({ tasks: initialTasks = [], onTasksChanged }
 
       // Update the task count
       setTotalTasks(prev => prev + 1);
+      setTaskCounts(prev => ({
+        ...prev,
+        pending: prev.pending + 1
+      }));
       
       // If we're on the first page, add the task to the list
       if (currentPage === 1) {
-        // Add the new task at the beginning and remove the last one if more than tasksPerPage
-        const updatedTasks = [data, ...tasks];
+        // Add the new task at the appropriate position based on status
+        const updatedTasks = [data, ...tasks].sort((a, b) => {
+          const statusOrder = { 'in_progress': 0, 'pending': 1, 'completed': 2 };
+          return statusOrder[a.status] - statusOrder[b.status];
+        });
+        
+        // Remove the last one if more than tasksPerPage
         if (updatedTasks.length > tasksPerPage) {
           updatedTasks.length = tasksPerPage;
         }
+        
         setTasks(updatedTasks);
       } else {
         // If on a different page, navigate to the first page to see the new task
@@ -180,20 +270,47 @@ export default function TaskManager({ tasks: initialTasks = [], onTasksChanged }
 
   const updateTaskStatus = async (id: string, status: string) => {
     try {
+      const taskToUpdate = tasks.find(task => task.id === id);
+      if (!taskToUpdate) return;
+
+      const oldStatus = taskToUpdate.status;
+      
+      const updates: any = { 
+        status,
+        updated_at: new Date().toISOString()
+      };
+      
+      // Add completed_at timestamp if marking as completed
+      if (status === "completed") {
+        updates.completed_at = new Date().toISOString();
+      }
+
       const { error } = await supabase
         .from("tasks")
-        .update({ 
-          status,
-          updated_at: new Date().toISOString(),
-          ...(status === "completed" ? { completed_at: new Date().toISOString() } : {})
-        })
+        .update(updates)
         .eq("id", id);
 
       if (error) throw error;
 
-      setTasks(tasks.map(task => 
-        task.id === id ? { ...task, status, updated_at: new Date().toISOString() } : task
-      ));
+      // Update the tasks array
+      const updatedTasks = tasks.map(task => 
+        task.id === id ? { ...task, ...updates } : task
+      );
+      
+      // Sort tasks after status change
+      const sortedTasks = updatedTasks.sort((a, b) => {
+        const statusOrder = { 'in_progress': 0, 'pending': 1, 'completed': 2 };
+        return statusOrder[a.status] - statusOrder[b.status];
+      });
+      
+      setTasks(sortedTasks);
+      
+      // Update task counts
+      setTaskCounts(prev => ({
+        ...prev,
+        [oldStatus]: prev[oldStatus] - 1,
+        [status]: prev[status] + 1
+      }));
       
       toast.success(`Tarea ${status === "completed" ? "completada" : "actualizada"}`);
       
@@ -213,6 +330,9 @@ export default function TaskManager({ tasks: initialTasks = [], onTasksChanged }
 
   const deleteTask = async (id: string) => {
     try {
+      const taskToDelete = tasks.find(task => task.id === id);
+      if (!taskToDelete) return;
+
       const { error } = await supabase
         .from("tasks")
         .update({ 
@@ -223,8 +343,15 @@ export default function TaskManager({ tasks: initialTasks = [], onTasksChanged }
 
       if (error) throw error;
 
+      // Remove task from the list
       setTasks(tasks.filter(task => task.id !== id));
       setTotalTasks(prev => prev - 1);
+      
+      // Update task counts
+      setTaskCounts(prev => ({
+        ...prev,
+        [taskToDelete.status]: prev[taskToDelete.status] - 1
+      }));
       
       toast.success("Tarea eliminada exitosamente");
       
@@ -272,12 +399,23 @@ export default function TaskManager({ tasks: initialTasks = [], onTasksChanged }
       case "completed":
         return <Badge className="bg-green-600 hover:bg-green-700">Completada</Badge>;
       case "in_progress":
-        return <Badge className="bg-blue-600 hover:bg-blue-700">En progreso</Badge>;
+        return <Badge className="bg-blue-600 hover:bg-blue-700 animate-pulse">En progreso</Badge>;
       case "pending":
         return <Badge className="bg-yellow-600 hover:bg-yellow-700">Pendiente</Badge>;
       default:
         return <Badge className="bg-gray-600 hover:bg-gray-700">{status}</Badge>;
     }
+  };
+
+  // Format minutes to hours and minutes display
+  const formatDuration = (minutes: number | undefined) => {
+    if (minutes === undefined || minutes === null) return "N/A";
+    const hours = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+    if (hours > 0) {
+      return `${hours}h:${mins}m`;
+    }
+    return `${mins}m`;
   };
 
   // Calculate total pages
@@ -293,6 +431,22 @@ export default function TaskManager({ tasks: initialTasks = [], onTasksChanged }
       </CardHeader>
       <CardContent>
         <div className="space-y-6">
+          {/* Task Counts */}
+          <div className="grid grid-cols-3 gap-2">
+            <div className="bg-[#262638] p-2 rounded text-center">
+              <span className="text-blue-400 text-sm">En Progreso</span>
+              <div className="text-white font-semibold">{taskCounts.in_progress}</div>
+            </div>
+            <div className="bg-[#262638] p-2 rounded text-center">
+              <span className="text-yellow-400 text-sm">Pendientes</span>
+              <div className="text-white font-semibold">{taskCounts.pending}</div>
+            </div>
+            <div className="bg-[#262638] p-2 rounded text-center">
+              <span className="text-green-400 text-sm">Completadas</span>
+              <div className="text-white font-semibold">{taskCounts.completed}</div>
+            </div>
+          </div>
+
           {/* Add Task Form */}
           <div className="flex space-x-2">
             <Input 
@@ -317,28 +471,58 @@ export default function TaskManager({ tasks: initialTasks = [], onTasksChanged }
               {tasks.map((task) => (
                 <div 
                   key={task.id} 
-                  className="flex items-center justify-between bg-[#262638] p-3 rounded-md"
+                  className={`flex items-center justify-between p-3 rounded-md
+                    ${task.status === 'in_progress' ? 'bg-[#1E293B]' : 'bg-[#262638]'}
+                    ${task.status === 'in_progress' ? 'border-l-4 border-blue-500' : ''}
+                  `}
                 >
-                  <div className="flex items-center space-x-3">
-                    <button 
-                      onClick={() => updateTaskStatus(task.id, task.status === "completed" ? "pending" : "completed")}
-                      className={`h-5 w-5 rounded-full flex items-center justify-center ${
-                        task.status === "completed" ? "bg-green-600 text-white" : "border border-gray-500"
-                      }`}
-                    >
-                      {task.status === "completed" && <Check className="h-3 w-3" />}
-                    </button>
-                    <span className={`text-white ${task.status === "completed" ? "line-through text-gray-400" : ""}`}>
-                      {task.name}
-                    </span>
-                    {getStatusBadge(task.status)}
+                  <div className="flex-1">
+                    <div className="flex items-center space-x-3">
+                      <button 
+                        onClick={() => updateTaskStatus(task.id, task.status === "completed" ? "pending" : "completed")}
+                        className={`h-5 w-5 rounded-full flex items-center justify-center ${
+                          task.status === "completed" ? "bg-green-600 text-white" : "border border-gray-500"
+                        }`}
+                      >
+                        {task.status === "completed" && <Check className="h-3 w-3" />}
+                      </button>
+                      <span className={`text-white ${task.status === "completed" ? "line-through text-gray-400" : ""}`}>
+                        {task.name}
+                      </span>
+                      {getStatusBadge(task.status)}
+                    </div>
+                    
+                    {/* Show duration for completed tasks */}
+                    {task.status === "completed" && task.duration_minutes && (
+                      <div className="ml-8 mt-1 text-xs text-gray-400 flex items-center">
+                        <Clock className="h-3 w-3 mr-1" />
+                        Tiempo total: {formatDuration(task.duration_minutes)}
+                        {task.completed_at && (
+                          <span className="ml-2">
+                            • Completada: {new Date(task.completed_at).toLocaleDateString()}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                    
+                    {/* If in progress, add a note */}
+                    {task.status === "in_progress" && (
+                      <div className="ml-8 mt-1 text-xs text-blue-400 flex items-center">
+                        <AlertCircle className="h-3 w-3 mr-1" />
+                        Tarea en progreso actualmente
+                      </div>
+                    )}
                   </div>
-                  <div className="flex items-center space-x-2">
+                  <div className="flex items-center space-x-2 ml-2">
                     <Button 
                       variant="ghost" 
                       size="sm"
                       onClick={() => startFocusSession(task)}
-                      className="h-8 w-8 p-0 text-green-400 hover:text-green-300 hover:bg-green-900/20"
+                      className={`h-8 w-8 p-0 
+                        ${task.status === "completed" 
+                          ? "text-gray-500 cursor-not-allowed" 
+                          : "text-green-400 hover:text-green-300 hover:bg-green-900/20"
+                        }`}
                       disabled={task.status === "completed"}
                     >
                       <Play className="h-4 w-4" />
@@ -430,7 +614,7 @@ export default function TaskManager({ tasks: initialTasks = [], onTasksChanged }
         <div className="flex items-center justify-between w-full text-sm text-gray-400">
           <div>Total: {totalTasks} tareas</div>
           <div>
-            Completadas: {tasks.filter(t => t.status === "completed").length} / {tasks.length} (en esta página)
+            Completadas: {taskCounts.completed} / {totalTasks} (total)
           </div>
         </div>
       </CardFooter>
