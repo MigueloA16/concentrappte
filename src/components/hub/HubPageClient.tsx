@@ -10,31 +10,8 @@ import FocusTimer from "@/components/timer/FocusTimer";
 import TaskManager from "@/components/timer/TaskManager";
 import { supabase } from "@/lib/supabase/client";
 import { useRouter, useSearchParams } from "next/navigation";
+import { Task, TimerSetting } from "@/lib/supabase/database.types";
 
-// Define types for our data
-type TimerSetting = {
-  id: string;
-  focus_time: number;
-  break_length: number;
-  target_sessions: number;
-  technique_id: string;
-  technique?: {
-    name: string;
-    description: string;
-  };
-};
-
-type Task = {
-  id: string;
-  name: string;
-  description?: string;
-  status: string;
-  priority?: string;
-  duration_minutes?: number;
-  created_at: string;
-  updated_at: string;
-  deleted?: boolean;
-};
 
 type FocusSession = {
   id: string;
