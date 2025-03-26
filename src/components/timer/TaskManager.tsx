@@ -1,4 +1,3 @@
-// src/components/timer/TaskManager.tsx - with improved pagination and loading states
 "use client";
 
 import { useState, useEffect } from "react";
@@ -276,11 +275,11 @@ export default function TaskManager({ tasks: initialTasks = [], onTasksChanged }
 
         if (sessionsError) throw sessionsError;
 
-        // Sum up all session durations
+        // Sum up all session durations, ensuring at least 1 minute total
         const totalDuration = taskSessions?.reduce((sum, session) =>
           sum + (session.duration_minutes || 0), 0) || 0;
 
-        updates.duration_minutes = totalDuration || 1;
+        updates.duration_minutes = Math.max(1, totalDuration);
       }
 
       const { error } = await supabase
@@ -447,8 +446,12 @@ export default function TaskManager({ tasks: initialTasks = [], onTasksChanged }
   // Format minutes to hours and minutes display
   const formatDuration = (minutes: number | undefined) => {
     if (minutes === undefined || minutes === null) return "N/A";
-    const hours = Math.floor(minutes / 60);
-    const mins = minutes % 60;
+    
+    // Ensure at least 1 minute is displayed
+    const displayMinutes = Math.max(1, minutes);
+    const hours = Math.floor(displayMinutes / 60);
+    const mins = displayMinutes % 60;
+    
     if (hours > 0) {
       return `${hours}h:${mins}m`;
     }
@@ -478,6 +481,18 @@ export default function TaskManager({ tasks: initialTasks = [], onTasksChanged }
       ))}
     </div>
   );
+
+  // Helper to format completed date nicely
+  const formatCompletedDate = (dateString: string | null) => {
+    if (!dateString) return "";
+    
+    try {
+      const date = new Date(dateString);
+      return date.toLocaleDateString();
+    } catch (error) {
+      return "";
+    }
+  };
 
   return (
     <Card className="w-full bg-[#1a1a2e] border-gray-800">
@@ -567,14 +582,14 @@ export default function TaskManager({ tasks: initialTasks = [], onTasksChanged }
                       {getStatusBadge(task.status)}
                     </div>
 
-                    {/* Show duration for completed tasks */}
-                    {task.status === "completed" && task.duration_minutes && (
+                    {/* Show duration and completion date for completed tasks */}
+                    {task.status === "completed" && (
                       <div className="ml-8 mt-1 text-xs text-gray-400 flex items-center">
                         <Clock className="h-3 w-3 mr-1" />
                         Tiempo total: {formatDuration(task.duration_minutes)}
                         {task.completed_at && (
                           <span className="ml-2">
-                            • Completada: {new Date(task.completed_at).toLocaleDateString()}
+                            • Completada: {formatCompletedDate(task.completed_at)}
                           </span>
                         )}
                       </div>
