@@ -91,7 +91,7 @@ const CompactTaskSelection: React.FC<TaskSelectionProps> = ({
       : "Selecciona una tarea";
 
   return (
-    <div className="mb-4">
+    <div className="">
       {isNewTaskMode ? (
         <div className="flex space-x-2">
           <Input

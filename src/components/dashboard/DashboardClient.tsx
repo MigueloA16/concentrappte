@@ -8,8 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/lib/supabase/client";
 import { toast } from "sonner";
-import { format, subDays, isToday, parseISO, startOfYear, eachDayOfInterval } from "date-fns";
-import { es } from "date-fns/locale";
+import { format, subDays, isToday, startOfYear, eachDayOfInterval } from "date-fns";
 import RecentAchievements from "@/components/achievements/RecentAchievements";
 import { AchievementWithProgress } from "@/lib/supabase/database.types";
 import { ActivityHeatmap } from "@/components/dashboard/ActivityHeatmap"; // Import the new component

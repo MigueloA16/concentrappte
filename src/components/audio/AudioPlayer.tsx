@@ -26,8 +26,8 @@ interface YouTubePlayer {
 const SOUND_OPTIONS = [
   { id: "firewood", name: "Firewood", type: "local", source: "/sounds/firewood.mp3" },
   { id: "rain", name: "Rain", type: "local", source: "/sounds/rain.mp3" },
-  { id: "classical", name: "Classical Music", type: "youtube", source: "https://www.youtube.com/watch?v=uFlzUaisbig" },
-  { id: "lofi", name: "Lofi Girl", type: "youtube", source: "https://www.youtube.com/watch?v=jfKfPfyJRdk" }
+  // { id: "classical", name: "Classical Music", type: "youtube", source: "https://www.youtube.com/watch?v=uFlzUaisbig" },
+  // { id: "lofi", name: "Lofi Girl", type: "youtube", source: "https://www.youtube.com/watch?v=jfKfPfyJRdk" }
 ];
 
 // YouTube player API
