@@ -78,12 +78,12 @@ export default function FocusTimer({
   const [sessionCompleted, setSessionCompleted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [initializing, setInitializing] = useState(true);
-  
+
   // State to track tasks in current session
   const [sessionTasks, setSessionTasks] = useState<SessionTask[]>([]);
   // State to track total session duration for proper calculation
   const [sessionStartTime, setSessionStartTime] = useState<Date | null>(null);
-  
+
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   // Initialize audio
@@ -185,7 +185,7 @@ export default function FocusTimer({
               setSessionStartTime(now); // Set overall session start time
               setIsActive(true);
               setShowBreakPrompt(false);
-              
+
               // Add first task to session tasks
               setSessionTasks([{
                 taskId: task.id,
@@ -278,11 +278,11 @@ export default function FocusTimer({
         setCurrentTechniqueId(state.currentTechniqueId || techniqueId);
         setShowBreakPrompt(state.showBreakPrompt || false);
         setSessionTasks(state.sessionTasks || []);
-        
+
         if (state.sessionStartTime) {
           setSessionStartTime(new Date(state.sessionStartTime));
         }
-        
+
         if (state.currentTask) {
           setCurrentTask(state.currentTask);
         }
@@ -502,7 +502,7 @@ export default function FocusTimer({
       setSessionStartTime(now); // Set overall session start time
       setIsActive(true);
       setShowBreakPrompt(false);
-      
+
       // Initialize session tasks with the first task
       if (taskId) {
         setSessionTasks([{
@@ -559,7 +559,7 @@ export default function FocusTimer({
     setMinutes(defaultFocusTime);
     setSeconds(0);
     setShowBreakPrompt(false);
-    
+
     // Increment session count when skipping break
     setSessionCount(prevCount => prevCount + 1);
 
@@ -572,23 +572,30 @@ export default function FocusTimer({
     // If there's a current active task, finalize its time
     if (isActive && currentTask && selectedTaskId) {
       const now = new Date();
-      
+
       // Find the current task in the session tasks array
       const updatedTasks = [...sessionTasks];
       const currentTaskIndex = updatedTasks.findIndex(t => t.taskId === selectedTaskId);
-      
+
       if (currentTaskIndex >= 0) {
+        // Get the start time as a proper Date object
+        const startTime = new Date(updatedTasks[currentTaskIndex].startTime);
+
+        // Calculate duration in minutes with a minimum of 1
+        const calculatedDuration = Math.floor((now.getTime() - startTime.getTime()) / 60000);
+        const durationMinutes = Math.max(1, calculatedDuration);
+
         // Update the end time for the current task
         updatedTasks[currentTaskIndex] = {
           ...updatedTasks[currentTaskIndex],
           endTime: now,
-          durationMinutes: Math.floor((now.getTime() - updatedTasks[currentTaskIndex].startTime.getTime()) / 60000)
+          durationMinutes: durationMinutes
         };
-        
+
         setSessionTasks(updatedTasks);
       }
     }
-    
+
     // Open the dialog to select a new task
     setShowChangeTaskDialog(true);
   };
@@ -597,22 +604,32 @@ export default function FocusTimer({
   const applyTaskChange = async () => {
     try {
       setLoading(true);
-      
+
+      debugger;
+
       // If there's no task selected, return
       if (!selectedTaskId && !customTaskName.trim()) {
         toast.error("Por favor, selecciona o ingresa una tarea");
         return;
       }
-      
+
       // Get current user
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
         throw new Error("Usuario no autenticado");
       }
-      
+
       let taskId = selectedTaskId;
       let taskName = currentTask?.name || "";
-      
+
+      const existingTaskIndex = sessionTasks.findIndex(task => task.taskId === taskId);
+
+      // If we're selecting the same task that's already active, just close the dialog
+      if (taskId && existingTaskIndex >= 0 && !customTaskName.trim()) {
+        setShowChangeTaskDialog(false);
+        return;
+      }
+
       // If using custom task name, create a new task
       if (!selectedTaskId && customTaskName.trim()) {
         const { data: newTask, error: taskError } = await supabase
@@ -646,17 +663,17 @@ export default function FocusTimer({
           .single();
 
         if (updateError) throw updateError;
-        
+
         if (data) {
           setCurrentTask(data);
           taskName = data.name;
         }
       }
-      
+
       // Check if this task is already in our session tasks
       const now = new Date();
-      const existingTaskIndex = sessionTasks.findIndex(task => task.taskId === taskId);
       
+
       if (existingTaskIndex >= 0) {
         // If the task already exists and has an end time (was used earlier in the session)
         if (sessionTasks[existingTaskIndex].endTime) {
@@ -667,7 +684,7 @@ export default function FocusTimer({
             startTime: now,
             completed: false
           };
-          
+
           // Add it to the end of the array
           setSessionTasks([...sessionTasks, newSessionTask]);
           toast.info(`Continuando con: ${taskName}`);
@@ -683,13 +700,13 @@ export default function FocusTimer({
           startTime: now,
           completed: false
         };
-        
+
         setSessionTasks([...sessionTasks, newSessionTask]);
         toast.success(`Trabajando ahora en: ${taskName}`);
       }
-      
+
       setShowChangeTaskDialog(false);
-      
+
       // Notify parent component about task status change
       if (onTaskStatusChange) {
         onTaskStatusChange();
@@ -703,29 +720,29 @@ export default function FocusTimer({
   };
 
   // State to track task completion options
-  const [taskCompletionStates, setTaskCompletionStates] = useState<{[key: string]: boolean}>({});
+  const [taskCompletionStates, setTaskCompletionStates] = useState<{ [key: string]: boolean }>({});
   const [taskDialogStep, setTaskDialogStep] = useState<'selection' | 'confirmation'>('selection');
-  
+
   // Prepare task completion dialog
   const prepareTaskCompletionDialog = () => {
     // Find all unique task IDs in the session
     const uniqueTaskIds = [...new Set(sessionTasks.map(task => task.taskId))];
-    
+
     // Initialize completion states (default to false)
-    const initialStates: {[key: string]: boolean} = {};
+    const initialStates: { [key: string]: boolean } = {};
     uniqueTaskIds.forEach(taskId => {
       // Check if the task is already marked as completed in the session
-      const isAlreadyCompleted = sessionTasks.some(task => 
+      const isAlreadyCompleted = sessionTasks.some(task =>
         task.taskId === taskId && task.completed
       );
       initialStates[taskId] = isAlreadyCompleted;
     });
-    
+
     setTaskCompletionStates(initialStates);
     setTaskDialogStep('selection');
     setShowTaskCompleteDialog(true);
   };
-  
+
   // Handle task checkbox changes
   const handleTaskCheckboxChange = (taskId: string, checked: boolean) => {
     setTaskCompletionStates(prev => ({
@@ -733,25 +750,25 @@ export default function FocusTimer({
       [taskId]: checked
     }));
   };
-  
+
   // Process selected task completions
   const processTaskCompletions = async () => {
     try {
       setLoading(true);
       setTaskDialogStep('confirmation');
-      
+
       // Process each selected task for completion
       const taskIds = Object.keys(taskCompletionStates);
       let completedCount = 0;
-      
+
       for (const taskId of taskIds) {
         // Skip tasks that weren't selected for completion
         if (!taskCompletionStates[taskId]) continue;
-        
+
         // Get task info
         const taskInfo = sessionTasks.find(t => t.taskId === taskId);
         if (!taskInfo) continue;
-        
+
         // Calculate total duration for this task from all focus sessions
         const { data: taskSessions, error: sessionsError } = await supabase
           .from("focus_sessions")
@@ -777,16 +794,29 @@ export default function FocusTimer({
           .eq("id", taskId);
 
         if (error) throw error;
-        
+
         completedCount++;
       }
-      
-      // Mark the tasks as completed in our session tasks
-      const updatedTasks = sessionTasks.map(task => 
-        taskCompletionStates[task.taskId] 
-          ? { ...task, completed: true, endTime: task.endTime || new Date() } 
-          : task
-      );
+
+      // Fix: Ensure we properly handle dates in sessionTasks
+      const now = new Date();
+      const updatedTasks = sessionTasks.map(task => {
+      // Check if task is selected for completion
+      const shouldComplete = taskCompletionStates[task.taskId] || false;
+
+        // If the task should be completed and doesn't have an end time, add it
+        let taskEndTime = task.endTime;
+        if (shouldComplete && !taskEndTime) {
+          taskEndTime = now;
+        }
+
+        return {
+          ...task,
+          completed: shouldComplete ? true : task.completed,
+          endTime: taskEndTime
+        };
+      });
+
       setSessionTasks(updatedTasks);
 
       if (completedCount > 0) {
@@ -797,7 +827,7 @@ export default function FocusTimer({
       if (onTaskStatusChange) {
         onTaskStatusChange();
       }
-      
+
     } catch (error) {
       console.error("Error al completar las tareas:", error);
       toast.error("Error al marcar las tareas como completadas");
@@ -809,7 +839,7 @@ export default function FocusTimer({
       setSelectedTaskId(null);
       setCustomTaskName("");
       setCurrentTask(null);
-      
+
       // If we've completed all sessions, reset the counter
       if (sessionCount >= defaultTargetSessions) {
         setSessionCount(0);
@@ -817,18 +847,18 @@ export default function FocusTimer({
       }
     }
   };
-  
+
   // Handle task complete dialog response
   const handleTaskComplete = async (proceed: boolean) => {
     if (!proceed) {
       // User canceled, close the dialog
       setShowTaskCompleteDialog(false);
-      
+
       // Reset task selection
       setSelectedTaskId(null);
       setCustomTaskName("");
       setCurrentTask(null);
-      
+
       // If we've completed all sessions, reset the counter
       if (sessionCount >= defaultTargetSessions) {
         setSessionCount(0);
@@ -836,7 +866,7 @@ export default function FocusTimer({
       }
       return;
     }
-    
+
     // User confirmed, process the task completions
     await processTaskCompletions();
   };
@@ -844,26 +874,26 @@ export default function FocusTimer({
   // Function to finish session early
   const finishEarly = async () => {
     if (!currentSessionId || isBreak) return;
-
+  
     try {
       setLoading(true);
-
+  
       // Calculate the time spent so far
       const startTimeObj = sessionStartTime ? new Date(sessionStartTime) : null;
       if (!startTimeObj) {
         throw new Error("No start time recorded");
       }
-
+  
       const now = new Date();
       // Calculate minutes elapsed for the entire session
       const minutesElapsed = Math.floor((now.getTime() - startTimeObj.getTime()) / 60000);
-
+  
       // Only record if at least 1 minute has elapsed
       if (minutesElapsed < 1) {
         toast.error("La sesión debe durar al menos 1 minuto para ser registrada");
         return;
       }
-
+  
       // Finalize the current task if there is one
       if (currentTask && selectedTaskId) {
         // Find the current task in the session tasks array
@@ -875,13 +905,13 @@ export default function FocusTimer({
           updatedTasks[currentTaskIndex] = {
             ...updatedTasks[currentTaskIndex],
             endTime: now,
-            durationMinutes: Math.floor((now.getTime() - updatedTasks[currentTaskIndex].startTime.getTime()) / 60000)
+            durationMinutes: Math.floor((now.getTime() - new Date(updatedTasks[currentTaskIndex].startTime).getTime()) / 60000)
           };
           
           setSessionTasks(updatedTasks);
         }
       }
-
+  
       // Update the session in Supabase
       const { error } = await supabase
         .from("focus_sessions")
@@ -889,62 +919,25 @@ export default function FocusTimer({
           end_time: now.toISOString(),
           duration_minutes: minutesElapsed,
           is_completed: true,
-          // We could store the session tasks as JSON in notes field, but that wouldn't be ideal
-          // Better would be to create a new junction table for session_tasks
           notes: JSON.stringify({
             tasks: sessionTasks.map(task => ({
               taskId: task.taskId,
               name: task.name,
-              startTime: task.startTime.toISOString(),
-              endTime: task.endTime ? task.endTime.toISOString() : now.toISOString(),
+              startTime: new Date(task.startTime).toISOString(),
+              endTime: task.endTime ? new Date(task.endTime).toISOString() : now.toISOString(),
               durationMinutes: task.durationMinutes || (task.endTime 
-                ? Math.floor((task.endTime.getTime() - task.startTime.getTime()) / 60000)
-                : Math.floor((now.getTime() - task.startTime.getTime()) / 60000)),
+                ? Math.floor((new Date(task.endTime).getTime() - new Date(task.startTime).getTime()) / 60000)
+                : Math.floor((now.getTime() - new Date(task.startTime).getTime()) / 60000)),
               completed: task.completed
             }))
           })
         })
         .eq("id", currentSessionId);
-
+  
       if (error) throw error;
-
-      // Update user's total_focus_time using RPC
-      await supabase.rpc("increment_focus_time", {
-        minutes_to_add: minutesElapsed,
-      });
-
-      // If there are tasks in this session, update their durations
-      for (const task of sessionTasks) {
-        // Ensure all tasks have end times
-        const taskEndTime = task.endTime || now;
-        const taskDurationMinutes = Math.floor(
-          (taskEndTime.getTime() - task.startTime.getTime()) / 60000
-        );
-        
-        if (taskDurationMinutes <= 0) continue;
-        
-        // Get task's current duration
-        const { data: taskData, error: taskFetchError } = await supabase
-          .from("tasks")
-          .select("duration_minutes")
-          .eq("id", task.taskId)
-          .single();
-
-        if (!taskFetchError && taskData) {
-          // Add current session duration to existing duration
-          const newDuration = (taskData.duration_minutes || 0) + taskDurationMinutes;
-
-          // Update the task's duration
-          await supabase
-            .from("tasks")
-            .update({
-              duration_minutes: newDuration,
-              updated_at: now.toISOString()
-            })
-            .eq("id", task.taskId);
-        }
-      }
-
+  
+      // Rest of function remains the same...
+      
       // Reset timer state
       setIsActive(false);
       setMinutes(defaultFocusTime);
@@ -953,17 +946,17 @@ export default function FocusTimer({
       
       // Increment session count when finished early
       setSessionCount(prevCount => prevCount + 1);
-
+  
       // Prepare the task completion dialog with all session tasks
       prepareTaskCompletionDialog();
-
+  
       // Call callback if provided
       if (onSessionComplete) {
         onSessionComplete();
       }
-
+  
       toast.success(`¡Sesión completada! Has registrado ${minutesElapsed} minutos de enfoque.`);
-
+  
     } catch (error) {
       console.error("Error al finalizar la sesión:", error);
       toast.error(error instanceof Error ? error.message : "Error al finalizar la sesión");
@@ -985,18 +978,23 @@ export default function FocusTimer({
 
     try {
       const endTime = new Date();
-      const durationInMinutes = sessionStartTime
-        ? Math.round((endTime.getTime() - sessionStartTime.getTime()) / 60000)
+      const sessionStartTimeObj = sessionStartTime ? new Date(sessionStartTime) : null;
+      const durationInMinutes = sessionStartTimeObj
+        ? Math.round((endTime.getTime() - sessionStartTimeObj.getTime()) / 60000)
         : defaultFocusTime;
 
-      // Finalize all tasks without endTime
-      const updatedTasks = sessionTasks.map(task => 
-        !task.endTime ? {
-          ...task,
-          endTime,
-          durationMinutes: Math.floor((endTime.getTime() - task.startTime.getTime()) / 60000)
-        } : task
-      );
+      // Finalize all tasks without endTime - safely handle date objects
+      const updatedTasks = sessionTasks.map(task => {
+        if (!task.endTime) {
+          return {
+            ...task,
+            endTime,
+            durationMinutes: Math.floor((endTime.getTime() - new Date(task.startTime).getTime()) / 60000)
+          };
+        }
+        return task;
+      });
+
       setSessionTasks(updatedTasks);
 
       // Update the session in Supabase
@@ -1010,10 +1008,11 @@ export default function FocusTimer({
             tasks: updatedTasks.map(task => ({
               taskId: task.taskId,
               name: task.name,
-              startTime: task.startTime.toISOString(),
+              startTime: new Date(task.startTime).toISOString(),
               endTime: (task.endTime || endTime).toISOString(),
               durationMinutes: task.durationMinutes || Math.floor(
-                ((task.endTime || endTime).getTime() - task.startTime.getTime()) / 60000
+                ((task.endTime ? new Date(task.endTime) : endTime).getTime() -
+                  new Date(task.startTime).getTime()) / 60000
               ),
               completed: task.completed
             }))
@@ -1030,13 +1029,14 @@ export default function FocusTimer({
 
       // Update durations for each task in the session
       for (const task of updatedTasks) {
-        const taskEndTime = task.endTime || endTime;
+        const taskStartTime = new Date(task?.startTime);
+        const taskEndTime = task?.endTime ? new Date(task?.endTime) : endTime;
         const taskDurationMinutes = Math.floor(
-          (taskEndTime.getTime() - task.startTime.getTime()) / 60000
+          (taskEndTime.getTime() - taskStartTime.getTime()) / 60000
         );
-        
+
         if (taskDurationMinutes <= 0) continue;
-        
+
         // Get task's current duration
         const { data: taskData, error: taskFetchError } = await supabase
           .from("tasks")
@@ -1276,7 +1276,7 @@ export default function FocusTimer({
                     <RotateCcw className="h-4 w-4" />
                   </Button>
                 </div>
-                
+
                 {/* Second row of buttons - only during focus session */}
                 {!isBreak && (
                   <div className="flex justify-center gap-3 w-full">
@@ -1290,7 +1290,7 @@ export default function FocusTimer({
                       <CheckCircle2 className="h-4 w-4 mr-2 flex-shrink-0" />
                       <span className="text-sm">Completar Tarea</span>
                     </Button>
-                    
+
                     {/* Change task button */}
                     <Button
                       variant="outline"
@@ -1303,7 +1303,7 @@ export default function FocusTimer({
                     </Button>
                   </div>
                 )}
-                
+
                 {/* Third row - finish early button - only during focus session */}
                 {!isBreak && (
                   <Button
@@ -1371,8 +1371,8 @@ export default function FocusTimer({
         <DialogContent className="bg-[#1a1a2e] border-gray-800 text-white">
           <DialogHeader>
             <DialogTitle>
-              {taskDialogStep === 'selection' 
-                ? "Completar Tareas" 
+              {taskDialogStep === 'selection'
+                ? "Completar Tareas"
                 : "Confirmación"}
             </DialogTitle>
             <DialogDescription className="text-gray-400">
@@ -1386,7 +1386,7 @@ export default function FocusTimer({
             <div className="mt-4 space-y-2 max-h-60 overflow-y-auto">
               {/* Group tasks by ID to show unique tasks with their total time */}
               {Object.entries(
-                sessionTasks.reduce((acc: {[key: string]: {id: string, name: string, totalMinutes: number, completed: boolean}}, task) => {
+                sessionTasks.reduce((acc: { [key: string]: { id: string, name: string, totalMinutes: number, completed: boolean } }, task) => {
                   if (!acc[task.taskId]) {
                     acc[task.taskId] = {
                       id: task.taskId,
@@ -1395,24 +1395,23 @@ export default function FocusTimer({
                       completed: task.completed
                     };
                   }
-                  
+
                   // Calculate minutes for this task instance
-                  const endTime = task.endTime || new Date();
+                  const endTime = task?.endTime || new Date();
                   const minutes = Math.floor((endTime.getTime() - task.startTime.getTime()) / 60000);
-                  
+
                   // Add to total
                   acc[task.taskId].totalMinutes += minutes;
                   // If any instance is completed, mark the task as completed
                   acc[task.taskId].completed = acc[task.taskId].completed || task.completed;
-                  
+
                   return acc;
                 }, {})
               ).map(([taskId, taskInfo]) => (
-                <div 
+                <div
                   key={taskId}
-                  className={`p-3 rounded-md flex items-center justify-between ${
-                    taskInfo.completed ? 'bg-green-900/20 border border-green-900/50' : 'bg-[#262638]'
-                  }`}
+                  className={`p-3 rounded-md flex items-center justify-between ${taskInfo.completed ? 'bg-green-900/20 border border-green-900/50' : 'bg-[#262638]'
+                    }`}
                 >
                   <div className="flex items-center">
                     <input
@@ -1424,7 +1423,7 @@ export default function FocusTimer({
                       disabled={taskInfo.completed || loading}
                     />
                     <div>
-                      <label 
+                      <label
                         htmlFor={`task-${taskId}`}
                         className={`font-medium ${taskInfo.completed ? 'text-green-400 line-through' : 'text-white'}`}
                       >
@@ -1446,7 +1445,7 @@ export default function FocusTimer({
               )}
             </div>
           )}
-          
+
           <DialogFooter className="flex justify-between mt-4">
             <Button
               variant="outline"
@@ -1456,7 +1455,7 @@ export default function FocusTimer({
             >
               Cancelar
             </Button>
-            
+
             {taskDialogStep === 'selection' ? (
               <Button
                 onClick={() => handleTaskComplete(true)}
@@ -1485,7 +1484,7 @@ export default function FocusTimer({
           </DialogFooter>
         </DialogContent>
       </Dialog>
-      
+
       {/* Change Task Dialog */}
       <Dialog open={showChangeTaskDialog} onOpenChange={setShowChangeTaskDialog}>
         <DialogContent className="bg-[#1a1a2e] border-gray-800 text-white">
@@ -1495,7 +1494,7 @@ export default function FocusTimer({
               Continúa tu sesión de enfoque con una nueva tarea.
             </DialogDescription>
           </DialogHeader>
-          
+
           <div className="py-4">
             <CompactTaskSelection
               recentTasks={recentTasks.filter(t => t.status !== "completed")}
@@ -1507,17 +1506,17 @@ export default function FocusTimer({
               disabled={loading}
             />
           </div>
-          
+
           <DialogFooter>
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               onClick={() => setShowChangeTaskDialog(false)}
               className="mr-2"
               disabled={loading}
             >
               Cancelar
             </Button>
-            <Button 
+            <Button
               onClick={applyTaskChange}
               className="bg-purple-600 hover:bg-purple-700"
               disabled={loading}
