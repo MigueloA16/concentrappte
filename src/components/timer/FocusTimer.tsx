@@ -2,19 +2,17 @@
 
 import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { 
-  Play, 
-  Pause, 
-  StopCircle, 
-  CheckCircle2, 
+import {
+  Play,
+  Pause,
+  StopCircle,
+  CheckCircle2,
   XCircle,
   Coffee,
   RotateCcw
 } from "lucide-react";
-import { 
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -41,7 +39,7 @@ type FocusTimerProps = {
   recentTasks: Task[];
   techniqueId?: string;
   onSessionComplete?: () => void;
-  onTaskStatusChange?: () => void; 
+  onTaskStatusChange?: () => void;
 };
 
 export default function FocusTimer({
@@ -63,7 +61,7 @@ export default function FocusTimer({
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const [startTime, setStartTime] = useState<Date | null>(null);
   const [currentTechniqueId, setCurrentTechniqueId] = useState(techniqueId);
-  
+
   // New states for the new features
   const [showBreakPrompt, setShowBreakPrompt] = useState(false);
   const [showTaskCompleteDialog, setShowTaskCompleteDialog] = useState(false);
@@ -76,7 +74,7 @@ export default function FocusTimer({
   // Initialize audio
   useEffect(() => {
     audioRef.current = new Audio("/sounds/bell.mp3");
-    
+
     // Add this check to prevent auto-play when component mounts
     const savedState = localStorage.getItem('timerState');
     if (savedState) {
@@ -88,7 +86,7 @@ export default function FocusTimer({
         }
       }
     }
-    
+
     return () => {
       if (audioRef.current) {
         audioRef.current.pause();
@@ -103,47 +101,47 @@ export default function FocusTimer({
     const handleAutoStart = async () => {
       const savedTask = localStorage.getItem('selectedTask');
       const autoStart = localStorage.getItem('autoStartSession');
-      
+
       if (savedTask && autoStart === 'true') {
         try {
           const task = JSON.parse(savedTask);
           console.log("Auto-start detected with task:", task.name);
-          
+
           // Set task info first
           setSelectedTaskId(task.id);
           setCurrentTask(task);
           setCustomTaskName(task.name || "");
-          
+
           // Wait a bit longer for state to update properly
           setTimeout(async () => {
             try {
               console.log("Auto-starting session for task:", task.name);
-              
+
               // Get current user
               const { data: { user } } = await supabase.auth.getUser();
-              
+
               if (!user) {
                 throw new Error("Usuario no autenticado");
               }
-              
+
               // First update the task status to in_progress
               const { data: updatedTask, error: taskUpdateError } = await supabase
                 .from("tasks")
-                .update({ 
+                .update({
                   status: "in_progress",
-                  updated_at: new Date().toISOString() 
+                  updated_at: new Date().toISOString()
                 })
                 .eq("id", task.id)
                 .select()
                 .single();
-                
+
               if (taskUpdateError) throw taskUpdateError;
-              
+
               // Update current task with the updated status
               if (updatedTask) {
                 setCurrentTask(updatedTask);
               }
-              
+
               // Create a new focus session in Supabase directly
               const now = new Date();
               const { data, error } = await supabase
@@ -157,20 +155,20 @@ export default function FocusTimer({
                 })
                 .select()
                 .single();
-                
+
               if (error) throw error;
-              
+
               // Update state with session info
               setCurrentSessionId(data.id);
               setStartTime(now);
               setIsActive(true);
               setShowBreakPrompt(false);
-              
+
               // If the component has a callback for task status changes, call it
               if (onTaskStatusChange) {
                 onTaskStatusChange();
               }
-              
+
               toast.success("¡Sesión de enfoque iniciada automáticamente!");
             } catch (err) {
               console.error("Error auto-starting timer:", err);
@@ -188,15 +186,15 @@ export default function FocusTimer({
         }
       }
     };
-    
+
     handleAutoStart();
   }, []); // Run once on mount with empty dependency array
-  
+
   // Regular task handling without auto-start
   useEffect(() => {
     const savedTask = localStorage.getItem('selectedTask');
     const autoStart = localStorage.getItem('autoStartSession');
-    
+
     // Only handle the saved task if not auto-starting
     if (savedTask && !autoStart && !isActive && !currentSessionId) {
       try {
@@ -210,39 +208,39 @@ export default function FocusTimer({
       }
     }
   }, [isActive, currentSessionId]);
-  
+
   // Load timer state on component mount
   useEffect(() => {
     const savedState = localStorage.getItem('timerState');
     if (savedState) {
       try {
         const state = JSON.parse(savedState);
-        
+
         // Check if the saved state is still valid
         const savedTime = state.startTime ? new Date(state.startTime) : null;
         const now = new Date();
-        
+
         // If no startTime or if the session has expired naturally, don't restore
         if (!savedTime || !state.isActive) {
           // Clear invalid state
           localStorage.removeItem('timerState');
           return;
         }
-        
+
         // Calculate if the timer should have naturally ended
         const elapsedMinutes = savedTime ? Math.floor((now.getTime() - savedTime.getTime()) / 60000) : 0;
         const totalMinutes = state.isBreak ? defaultBreakLength : defaultFocusTime;
-        
+
         if (elapsedMinutes >= totalMinutes) {
           // Timer would have ended naturally, don't restore
           localStorage.removeItem('timerState');
           return;
         }
-        
+
         // Calculate the remaining time
         const remainingMinutes = Math.max(0, totalMinutes - elapsedMinutes - 1);
         const remainingSeconds = Math.max(0, 59 - Math.floor((now.getTime() - savedTime.getTime()) / 1000) % 60);
-        
+
         // Restore valid state with adjusted time
         setMinutes(remainingMinutes);
         setSeconds(remainingSeconds);
@@ -266,7 +264,7 @@ export default function FocusTimer({
       }
     }
   }, [defaultBreakLength, defaultFocusTime, techniqueId]);
-  
+
   // Find selected task when task ID changes
   useEffect(() => {
     if (selectedTaskId) {
@@ -278,7 +276,7 @@ export default function FocusTimer({
       setCurrentTask(null);
     }
   }, [selectedTaskId, recentTasks, customTaskName]);
-  
+
   // Update techniqueId when it changes from props
   useEffect(() => {
     setCurrentTechniqueId(techniqueId);
@@ -308,15 +306,15 @@ export default function FocusTimer({
 
     saveTimerState();
   }, [
-    minutes, 
-    seconds, 
-    isActive, 
-    isBreak, 
-    sessionCount, 
-    selectedTaskId, 
-    customTaskName, 
-    currentSessionId, 
-    currentTechniqueId, 
+    minutes,
+    seconds,
+    isActive,
+    isBreak,
+    sessionCount,
+    selectedTaskId,
+    customTaskName,
+    currentSessionId,
+    currentTechniqueId,
     startTime,
     showBreakPrompt,
     currentTask
@@ -350,7 +348,7 @@ export default function FocusTimer({
               // Focus session finished
               setIsActive(false);
               handleSessionComplete();
-              
+
               // Set up for break but don't start it automatically
               setShowBreakPrompt(true);
               toast.success("¡Sesión de enfoque completada! Toma un descanso cuando estés listo.");
@@ -371,38 +369,37 @@ export default function FocusTimer({
   }, [isActive, minutes, seconds, isBreak, defaultFocusTime, defaultBreakLength, defaultTargetSessions, sessionCount]);
 
 
-  const startTimer = async () => {    
+  const startTimer = async () => {
     try {
       // If showing break prompt, don't start a new session
       if (showBreakPrompt) {
         return;
       }
-      
+
       // If on a break, just start the timer without creating a session
       if (isBreak) {
         setIsActive(true);
         return;
       }
-      
+
       // Check if we need to select a task first
       if (!selectedTaskId && !customTaskName.trim()) {
         toast.error("Por favor, ingresa o selecciona una tarea");
         return;
       }
-      
+
       // Clear the auto-start flag if it exists
       localStorage.removeItem('autoStartSession');
-  
+
       setLoading(true);
       // Get current user
       const { data: { user } } = await supabase.auth.getUser();
-  
+
       if (!user) {
         throw new Error("Usuario no autenticado");
       }
-  
+
       let taskId = selectedTaskId;
-      let updatedTask = null;
       
       // If using a custom task name, create a new task first
       if (!selectedTaskId && customTaskName.trim()) {
@@ -416,29 +413,25 @@ export default function FocusTimer({
           })
           .select()
           .single();
-          
+
         if (taskError) throw taskError;
-        
+
         taskId = newTask.id;
-        updatedTask = newTask;
         setCurrentTask(newTask);
       } else if (selectedTaskId) {
         // If we have a selected existing task, update its status to in_progress
         const { data, error: updateError } = await supabase
           .from("tasks")
-          .update({ 
+          .update({
             status: "in_progress",
-            updated_at: new Date().toISOString() 
+            updated_at: new Date().toISOString()
           })
           .eq("id", selectedTaskId)
           .select()
           .single();
-          
+
         if (updateError) throw updateError;
-        
-        // Important: Store the updated task data
-        updatedTask = data;
-        
+
         // Update the current task state to reflect the change
         if (currentTask) {
           setCurrentTask({
@@ -450,7 +443,7 @@ export default function FocusTimer({
           setCurrentTask(data);
         }
       }
-  
+
       // Create a new focus session in Supabase
       const now = new Date();
       const { data, error } = await supabase
@@ -464,19 +457,19 @@ export default function FocusTimer({
         })
         .select()
         .single();
-  
+
       if (error) throw error;
-  
+
       setCurrentSessionId(data.id);
       setStartTime(now);
       setIsActive(true);
       setShowBreakPrompt(false);
-      
+
       // If we have a callback for task status changes, call it
       if (onTaskStatusChange) {
         onTaskStatusChange();
       }
-      
+
       toast.success("¡Sesión de enfoque iniciada!");
     } catch (error) {
       console.error("Error al iniciar la sesión:", error);
@@ -497,7 +490,7 @@ export default function FocusTimer({
     setStartTime(null);
     setShowBreakPrompt(false);
   };
-  
+
   // Start the break session
   const startBreak = () => {
     setIsBreak(true);
@@ -508,7 +501,7 @@ export default function FocusTimer({
     setShowBreakPrompt(false);
     toast.success("¡Comenzando descanso!");
   };
-  
+
   // Skip the break
   const skipBreak = () => {
     // Important: Keep the task intact for the dialog
@@ -517,29 +510,43 @@ export default function FocusTimer({
     setSeconds(0);
     setShowBreakPrompt(false);
     setSessionCount(prevCount => prevCount + 1);
-    
+
     // Show task complete dialog
     setShowTaskCompleteDialog(true);
   };
-  
+
   // Handle task complete dialog response
   const handleTaskComplete = async (complete: boolean) => {
     if (complete && currentTask) {
       try {
-        // Update the task status to completed in the database
+        // Calculate total duration for this task from all focus sessions
+        const { data: taskSessions, error: sessionsError } = await supabase
+          .from("focus_sessions")
+          .select("duration_minutes")
+          .eq("task_id", currentTask.id)
+          .eq("is_completed", true);
+
+        if (sessionsError) throw sessionsError;
+
+        // Sum up all session durations
+        const totalDuration = taskSessions?.reduce((sum, session) =>
+          sum + (session.duration_minutes || 0), 0) || 0;
+
+        // Update the task status to completed in the database with duration
         const { error } = await supabase
           .from("tasks")
-          .update({ 
+          .update({
             status: "completed",
             updated_at: new Date().toISOString(),
-            completed_at: new Date().toISOString()
+            completed_at: new Date().toISOString(),
+            duration_minutes: totalDuration // Update the total duration
           })
           .eq("id", currentTask.id);
-        
+
         if (error) throw error;
-        
-        toast.success(`Tarea "${currentTask.name}" marcada como completada`);
-        
+
+        toast.success(`Tarea "${currentTask.name}" completada en ${totalDuration} minutos`);
+
         // Notify parent component
         if (onTaskStatusChange) {
           onTaskStatusChange();
@@ -549,43 +556,43 @@ export default function FocusTimer({
         toast.error("Error al marcar la tarea como completada");
       }
     }
-    
+
     // Close the dialog
     setShowTaskCompleteDialog(false);
-    
+
     // Reset task selection AFTER handling the dialog response
     setSelectedTaskId(null);
     setCustomTaskName("");
     setCurrentTask(null);
-    
+
     // If we've completed all sessions, reset the counter
     if (sessionCount >= defaultTargetSessions) {
       setSessionCount(0);
       toast.success("¡Felicitaciones! Has completado todas tus sesiones de enfoque.");
     }
   };
-  
-  // New function to finish session early
+
+  // Function to finish session early
   const finishEarly = async () => {
     if (!currentSessionId || isBreak) return;
-    
+
     try {
       // Calculate the time spent so far
       const startTimeObj = startTime ? new Date(startTime) : null;
       if (!startTimeObj) {
         throw new Error("No start time recorded");
       }
-      
+
       const now = new Date();
       // Calculate minutes elapsed
       const minutesElapsed = Math.floor((now.getTime() - startTimeObj.getTime()) / 60000);
-      
+
       // Only record if at least 1 minute has elapsed
       if (minutesElapsed < 1) {
         toast.error("La sesión debe durar al menos 1 minuto para ser registrada");
         return;
       }
-      
+
       // Update the session in Supabase
       const { error } = await supabase
         .from("focus_sessions")
@@ -597,28 +604,52 @@ export default function FocusTimer({
         .eq("id", currentSessionId);
 
       if (error) throw error;
-      
+
       // Update user's total_focus_time using RPC
       await supabase.rpc("increment_focus_time", {
         minutes_to_add: minutesElapsed,
       });
-      
+
+      // If there's a task assigned to this session, update its duration
+      if (selectedTaskId) {
+        // Get task's current duration
+        const { data: taskData, error: taskFetchError } = await supabase
+          .from("tasks")
+          .select("duration_minutes")
+          .eq("id", selectedTaskId)
+          .single();
+
+        if (!taskFetchError && taskData) {
+          // Add current session duration to existing duration
+          const newDuration = (taskData.duration_minutes || 0) + minutesElapsed;
+
+          // Update the task's duration
+          await supabase
+            .from("tasks")
+            .update({
+              duration_minutes: newDuration,
+              updated_at: now.toISOString()
+            })
+            .eq("id", selectedTaskId);
+        }
+      }
+
       // Reset timer state
       setIsActive(false);
       setMinutes(defaultFocusTime);
       setSeconds(0);
       cleanupTimerState();
-      
+
       // Show task complete dialog
       setShowTaskCompleteDialog(true);
-      
+
       // Call callback if provided
       if (onSessionComplete) {
         onSessionComplete();
       }
-      
+
       toast.success(`¡Sesión completada! Has registrado ${minutesElapsed} minutos de enfoque.`);
-      
+
     } catch (error) {
       console.error("Error al finalizar la sesión:", error);
       toast.error(error instanceof Error ? error.message : "Error al finalizar la sesión");
@@ -629,7 +660,7 @@ export default function FocusTimer({
     setIsActive(false);
     setMinutes(isBreak ? defaultBreakLength : defaultFocusTime);
     setSeconds(0);
-    cleanupTimerState(); 
+    cleanupTimerState();
     toast.info("Temporizador reiniciado");
   };
 
@@ -659,9 +690,33 @@ export default function FocusTimer({
         minutes_to_add: durationInMinutes,
       });
 
+      // If there's a task assigned to this session, update its duration
+      if (selectedTaskId) {
+        // Get task's current duration
+        const { data: taskData, error: taskFetchError } = await supabase
+          .from("tasks")
+          .select("duration_minutes")
+          .eq("id", selectedTaskId)
+          .single();
+
+        if (!taskFetchError && taskData) {
+          // Add current session duration to existing duration
+          const newDuration = (taskData.duration_minutes || 0) + durationInMinutes;
+
+          // Update the task's duration
+          await supabase
+            .from("tasks")
+            .update({
+              duration_minutes: newDuration,
+              updated_at: endTime.toISOString()
+            })
+            .eq("id", selectedTaskId);
+        }
+      }
+
       setCurrentSessionId(null);
       setStartTime(null);
-      
+
       // Call callback if provided
       if (onSessionComplete) {
         onSessionComplete();
@@ -742,23 +797,11 @@ export default function FocusTimer({
             </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-4 w-full max-w-xs">
-          {/* Compact Task Selection - Only show when not in active mode and not during break */}
-          {!isActive && !isBreak && !showBreakPrompt && (
-            <CompactTaskSelection
-              recentTasks={recentTasks}
-              selectedTaskId={selectedTaskId}
-              customTaskName={customTaskName}
-              setSelectedTaskId={setSelectedTaskId}
-              setCustomTaskName={setCustomTaskName}
-              setCurrentTask={setCurrentTask}
-              disabled={loading}
-            />
-          )}
-            
+          {/* Centered container with max width */}
+          <div className="flex flex-col items-center w-full max-w-md mx-auto">
             {/* Break Prompt - show when a focus session just ended */}
             {showBreakPrompt && (
-              <div className="space-y-4 bg-[#262638] p-4 rounded-lg border border-gray-700">
+              <div className="space-y-4 bg-[#262638] p-4 rounded-lg border border-gray-700 w-full max-w-md">
                 <div className="text-center">
                   <h3 className="text-base text-white mb-2">¡Sesión completada!</h3>
                   <p className="text-gray-300 text-xs">Tu sesión de enfoque ha terminado. ¿Qué te gustaría hacer?</p>
@@ -785,70 +828,79 @@ export default function FocusTimer({
               </div>
             )}
 
-  {/* Controls Container */}
-  <div className="flex justify-center w-full max-w-sm mx-auto">
-            {/* Regular Timer controls - don't show during break prompt */}
-            {!showBreakPrompt && (
-              <div className={`flex gap-4 justify-center w-full`}>
-                {!isActive ? (
-                  <>
-                    <Button
-                      className="bg-purple-600 hover:bg-purple-700 px-6 py-1 h-10"
-                      onClick={startTimer}
-                      disabled={(!selectedTaskId && !customTaskName.trim()) || loading}
-                    >
-                      <Play className="h-4 w-4 mr-2" />
-                      <span className="text-sm">Comenzar</span>
-                    </Button>
-                    <Button
-                      variant="outline"
-                      onClick={resetTimer}
-                      className="border-gray-700 text-gray-400 hover:bg-gray-800 hover:text-white p-0 w-10 h-10"
-                    >
-                      <RotateCcw className="h-4 w-4" />
-                    </Button>
-                  </>
-                ) : (
-                  <>
-                    <Button
-                      variant="outline"
-                      onClick={pauseTimer}
-                      className="border-purple-700 text-purple-400 hover:bg-purple-900/20 px-6 py-1 h-10"
-                    >
-                      <Pause className="h-4 w-4 mr-2" />
-                      <span className="text-sm">Pausar</span>
-                    </Button>
-                    <Button
-                      variant="outline"
-                      onClick={resetTimer}
-                      className="border-gray-700 text-gray-400 hover:bg-gray-800 hover:text-white p-0 w-10 h-10"
-                    >
-                      <RotateCcw className="h-4 w-4" />
-                    </Button>
-                    
-                    {/* Finish early button - only show during active focus session */}
-                    {!isBreak && (
-                      <Button
-                        variant="outline"
-                        onClick={finishEarly}
-                        className="border-green-700 text-green-400 hover:bg-green-900/20 px-6 py-1 h-10"
-                      >
-                        <StopCircle className="h-4 w-4 mr-2" />
-                        <span className="text-sm">Finalizar</span>
-                      </Button>
-                    )}
-                  </>
+            {/* Task selector with buttons in-line - improved alignment */}
+            {!showBreakPrompt && !isActive && !isBreak && (
+              <div className="flex items-center gap-3 w-full">
+                <div className="flex-1">
+                  <CompactTaskSelection
+                    recentTasks={recentTasks}
+                    selectedTaskId={selectedTaskId}
+                    customTaskName={customTaskName}
+                    setSelectedTaskId={setSelectedTaskId}
+                    setCustomTaskName={setCustomTaskName}
+                    setCurrentTask={setCurrentTask}
+                    disabled={loading}
+                  />
+                </div>
+                <Button
+                  className="bg-purple-600 hover:bg-purple-700 h-9 whitespace-nowrap"
+                  onClick={startTimer}
+                  disabled={(!selectedTaskId && !customTaskName.trim()) || loading}
+                >
+                  <Play className="h-4 w-4 mr-2" />
+                  <span className="text-sm">Comenzar</span>
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={resetTimer}
+                  className="border-gray-700 text-gray-400 hover:bg-gray-800 hover:text-white min-w-9 h-9 p-0 flex items-center justify-center"
+                >
+                  <RotateCcw className="h-4 w-4" />
+                </Button>
+              </div>
+            )}
+
+            {/* Controls for active timer state */}
+            {!showBreakPrompt && isActive && (
+              <div className="flex justify-center gap-3 w-full">
+                <Button
+                  variant="outline"
+                  onClick={pauseTimer}
+                  className="border-purple-700 text-purple-400 hover:bg-purple-900/20 px-6 h-9"
+                >
+                  <Pause className="h-4 w-4 mr-2" />
+                  <span className="text-sm">Pausar</span>
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={resetTimer}
+                  className="border-gray-700 text-gray-400 hover:bg-gray-800 hover:text-white min-w-9 h-9 p-0 flex items-center justify-center"
+                >
+                  <RotateCcw className="h-4 w-4" />
+                </Button>
+
+                {/* Finish early button - only show during active focus session */}
+                {!isBreak && (
+                  <Button
+                    variant="outline"
+                    onClick={finishEarly}
+                    className="border-green-700 text-green-400 hover:bg-green-900/20 px-6 h-9"
+                  >
+                    <StopCircle className="h-4 w-4 mr-2" />
+                    <span className="text-sm">Finalizar</span>
+                  </Button>
                 )}
               </div>
             )}
+
+            {/* Audio player moved inside the centered container */}
+            <div className="mt-6 w-full flex justify-center">
+              <AudioPlayer />
+            </div>
           </div>
-        </div>
-        
-        {/* Add the AudioPlayer component below all timer controls */}
-        <AudioPlayer />
-      </CardContent>
+        </CardContent>
       </Card>
-      
+
       {/* Task Complete Dialog */}
       <Dialog open={showTaskCompleteDialog} onOpenChange={setShowTaskCompleteDialog}>
         <DialogContent className="bg-[#1a1a2e] border-gray-800 text-white">
@@ -862,17 +914,17 @@ export default function FocusTimer({
               )}
             </DialogDescription>
           </DialogHeader>
-          
+
           {currentTask && (
             <div className="flex space-x-2 mt-4">
-              <Button 
+              <Button
                 onClick={() => handleTaskComplete(true)}
                 className="flex-1 bg-purple-600 hover:bg-purple-700"
               >
                 <CheckCircle2 className="h-4 w-4 mr-2" />
                 Sí, completada
               </Button>
-              <Button 
+              <Button
                 onClick={() => handleTaskComplete(false)}
                 variant="outline"
                 className="flex-1 border-gray-600"
@@ -882,7 +934,7 @@ export default function FocusTimer({
               </Button>
             </div>
           )}
-          
+
           {!currentTask && (
             <DialogFooter>
               <Button onClick={() => handleTaskComplete(false)}>
