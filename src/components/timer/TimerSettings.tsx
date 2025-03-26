@@ -7,10 +7,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
-import { Clock, Info } from "lucide-react";
+import { Clock, Info, Loader2 } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
+import { TimerSettings as TimerSettingsType } from "@/lib/supabase/database.types";
+import { Skeleton } from "@/components/ui/skeleton";
 
 // Define time management techniques with their default values
 const TIME_MANAGEMENT_TECHNIQUES = [
@@ -65,10 +67,9 @@ const TIME_MANAGEMENT_TECHNIQUES = [
 ];
 
 interface TimerSettingsProps {
-  initialSettings?: any; // Or define a more specific type
-  onSettingsChanged?: () => void; // New callback prop for notifying parent component
+  initialSettings?: TimerSettingsType;
+  onSettingsChanged?: () => void;
 }
-
 
 export default function TimerSettings({ initialSettings, onSettingsChanged }: TimerSettingsProps) {
   const router = useRouter();
@@ -132,7 +133,7 @@ export default function TimerSettings({ initialSettings, onSettingsChanged }: Ti
   }, [initialSettings]);
 
   // Handle technique change
-  const handleTechniqueChange = (techniqueId) => {
+  const handleTechniqueChange = (techniqueId: string) => {
     const technique = TIME_MANAGEMENT_TECHNIQUES.find(t => t.id === techniqueId);
 
     if (technique) {
@@ -199,15 +200,15 @@ export default function TimerSettings({ initialSettings, onSettingsChanged }: Ti
       if (error) throw error;
 
       toast.success("Configuración guardada exitosamente");
-      
+
       // Call the callback to notify parent component of the update
       if (onSettingsChanged) {
         onSettingsChanged();
       }
-      
+
       // Refresh the page data
       router.refresh();
-      
+
     } catch (error) {
       console.error("Error saving timer settings:", error);
       toast.error("Error al guardar la configuración");
@@ -217,6 +218,52 @@ export default function TimerSettings({ initialSettings, onSettingsChanged }: Ti
   };
 
   const selectedTechnique = TIME_MANAGEMENT_TECHNIQUES.find(t => t.id === selectedTechniqueId) || TIME_MANAGEMENT_TECHNIQUES[0];
+
+  // Loading state
+  if (loading) {
+    return (
+      <Card className="w-full bg-[#1a1a2e] border-gray-800">
+        <CardHeader>
+          <CardTitle className="text-white flex items-center">
+            <Clock className="mr-2 h-5 w-5 text-purple-400" />
+            Configuración del Temporizador
+          </CardTitle>
+          <CardDescription className="text-gray-400">
+            Cargando configuración...
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="space-y-2">
+            <Label className="text-gray-300">Técnica de gestión del tiempo</Label>
+            <Skeleton className="h-9 w-full" />
+            <Skeleton className="h-5 w-full mt-1" />
+          </div>
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <Label className="text-gray-300">Tiempo de enfoque</Label>
+              <Skeleton className="h-5 w-20" />
+            </div>
+            <Skeleton className="h-5 w-full" />
+          </div>
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <Label className="text-gray-300">Tiempo de descanso</Label>
+              <Skeleton className="h-5 w-20" />
+            </div>
+            <Skeleton className="h-5 w-full" />
+          </div>
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <Label className="text-gray-300">Sesiones objetivo</Label>
+              <Skeleton className="h-5 w-20" />
+            </div>
+            <Skeleton className="h-5 w-full" />
+          </div>
+          <Skeleton className="h-9 w-full" />
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card className="w-full bg-[#1a1a2e] border-gray-800">
@@ -237,7 +284,7 @@ export default function TimerSettings({ initialSettings, onSettingsChanged }: Ti
           <Select
             value={selectedTechniqueId}
             onValueChange={handleTechniqueChange}
-            disabled={loading}
+            disabled={saving}
           >
             <SelectTrigger className="bg-[#262638] border-gray-700 text-white">
               <SelectValue placeholder="Selecciona una técnica" />
@@ -278,7 +325,7 @@ export default function TimerSettings({ initialSettings, onSettingsChanged }: Ti
                   setSelectedTechniqueId("custom");
                 }
               }}
-              disabled={loading}
+              disabled={saving}
               className="flex-1"
             />
             <Input
@@ -297,7 +344,7 @@ export default function TimerSettings({ initialSettings, onSettingsChanged }: Ti
               min={1}
               max={120}
               className="w-16 bg-[#262638] border-gray-700 text-white"
-              disabled={loading}
+              disabled={saving}
             />
           </div>
         </div>
@@ -323,7 +370,7 @@ export default function TimerSettings({ initialSettings, onSettingsChanged }: Ti
                   setSelectedTechniqueId("custom");
                 }
               }}
-              disabled={loading}
+              disabled={saving}
               className="flex-1"
             />
             <Input
@@ -342,7 +389,7 @@ export default function TimerSettings({ initialSettings, onSettingsChanged }: Ti
               min={1}
               max={30}
               className="w-16 bg-[#262638] border-gray-700 text-white"
-              disabled={loading}
+              disabled={saving}
             />
           </div>
         </div>
@@ -368,7 +415,7 @@ export default function TimerSettings({ initialSettings, onSettingsChanged }: Ti
                   setSelectedTechniqueId("custom");
                 }
               }}
-              disabled={loading}
+              disabled={saving}
               className="flex-1"
             />
             <Input
@@ -387,7 +434,7 @@ export default function TimerSettings({ initialSettings, onSettingsChanged }: Ti
               min={1}
               max={10}
               className="w-16 bg-[#262638] border-gray-700 text-white"
-              disabled={loading}
+              disabled={saving}
             />
           </div>
         </div>
@@ -397,9 +444,14 @@ export default function TimerSettings({ initialSettings, onSettingsChanged }: Ti
           <Button
             className="w-full bg-purple-600 hover:bg-purple-700 text-white"
             onClick={saveSettings}
-            disabled={loading || saving}
+            disabled={saving}
           >
-            {saving ? "Guardando..." : "Guardar configuración"}
+            {saving ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Guardando...
+              </>
+            ) : "Guardar configuración"}
           </Button>
         </div>
       </CardContent>
