@@ -52,9 +52,10 @@ export default function RecentAchievements({ achievements, isLoading = false }: 
           <div className="flex justify-between items-center">
             <div>
               <CardTitle className="text-white">Logros</CardTitle>
-              <CardDescription className="text-gray-400 mt-2">
+              {/* Fixed: Don't put Skeleton inside CardDescription */}
+              <div className="text-gray-400 mt-2">
                 <Skeleton className="h-4 w-48" />
-              </CardDescription>
+              </div>
             </div>
             <Skeleton className="h-9 w-20" />
           </div>
