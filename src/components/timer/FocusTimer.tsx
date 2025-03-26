@@ -745,21 +745,52 @@ export default function FocusTimer({
   
   // Prepare task completion dialog
   const prepareTaskCompletionDialog = () => {
-    // Find all unique task IDs in the session
-    const uniqueTaskIds = [...new Set(sessionTasks.map(task => task.taskId))];
+    // Only consider tasks that have actually been worked on in this session
+    const taskIdsInSession = sessionTasks
+      .filter(task => !task.completed)  // Only include incomplete tasks
+      .map(task => task.taskId);
     
-    // Initialize completion states (default to false)
+    // If there are no incomplete tasks, don't show the dialog
+    if (taskIdsInSession.length === 0) {
+      setAllTasksCompleted(true);
+      
+      // Reset task selection and show success message
+      setSelectedTaskId(null);
+      setCustomTaskName("");
+      setCurrentTask(null);
+      
+      toast.success("Todas las tareas ya están completadas");
+      
+      // If we've completed all sessions, reset the counter
+      if (sessionCount >= defaultTargetSessions) {
+        setSessionCount(0);
+        toast.success("¡Felicitaciones! Has completado todas tus sesiones de enfoque.");
+      }
+      
+      return;
+    }
+    
+    // Create a new object with task IDs as keys and pre-check if it's a single task
     const initialStates: {[key: string]: boolean} = {};
-    uniqueTaskIds.forEach(taskId => {
-      // Check if the task is already marked as completed in the session
-      const isAlreadyCompleted = sessionTasks.some(task => 
-        task.taskId === taskId && task.completed
-      );
-      initialStates[taskId] = isAlreadyCompleted;
+    const defaultChecked = taskIdsInSession.length === 1;
+    
+    // Add each task ID with its default checked state
+    taskIdsInSession.forEach(taskId => {
+      initialStates[taskId] = defaultChecked;
     });
     
+    console.log("Session tasks:", sessionTasks);
+    console.log("Task IDs in session:", taskIdsInSession);
+    console.log("Initial completion states:", initialStates);
+    
+    // If we still somehow have no tasks to show, don't display the dialog
+    if (Object.keys(initialStates).length === 0) {
+      toast.info("No hay tareas pendientes para completar");
+      return;
+    }
+    
+    // Set the states and show the dialog
     setTaskCompletionStates(initialStates);
-    setTaskDialogStep('selection');
     setShowTaskCompleteDialog(true);
   };
   
@@ -775,7 +806,6 @@ export default function FocusTimer({
   const processTaskCompletions = async () => {
     try {
       setLoading(true);
-      setTaskDialogStep('confirmation');
       
       // Process each selected task for completion
       const taskIds = Object.keys(taskCompletionStates);
@@ -847,13 +877,6 @@ export default function FocusTimer({
         onTaskStatusChange();
       }
       
-    } catch (error) {
-      console.error("Error al completar las tareas:", error);
-      toast.error("Error al marcar las tareas como completadas");
-    } finally {
-      setLoading(false);
-      // Close the dialog
-      setShowTaskCompleteDialog(false);
       // Reset task selection
       setSelectedTaskId(null);
       setCustomTaskName("");
@@ -864,6 +887,14 @@ export default function FocusTimer({
         setSessionCount(0);
         toast.success("¡Felicitaciones! Has completado todas tus sesiones de enfoque.");
       }
+      
+    } catch (error) {
+      console.error("Error al completar las tareas:", error);
+      toast.error("Error al marcar las tareas como completadas");
+    } finally {
+      setLoading(false);
+      // Close the dialog
+      setShowTaskCompleteDialog(false);
     }
   };
   
@@ -872,6 +903,9 @@ export default function FocusTimer({
     if (!proceed) {
       // User canceled, close the dialog
       setShowTaskCompleteDialog(false);
+      
+      // Now we can clean up the timer state
+      cleanupTimerState();
       
       // Reset task selection
       setSelectedTaskId(null);
@@ -886,8 +920,11 @@ export default function FocusTimer({
       return;
     }
     
-    // User confirmed, process the task completions
+    // User confirmed, process the task completions directly
     await processTaskCompletions();
+    
+    // Clean up timer state after processing
+    cleanupTimerState();
   };
 
   // Function to finish session early
@@ -936,6 +973,21 @@ export default function FocusTimer({
         }
       }
 
+      // Make sure all tasks have end times
+      const finalizedTasks = sessionTasks.map(task => {
+        if (!task.endTime) {
+          const duration = Math.max(1, Math.round((now.getTime() - task.startTime.getTime()) / 60000));
+          return {
+            ...task,
+            endTime: now,
+            durationMinutes: duration
+          };
+        }
+        return task;
+      });
+      
+      setSessionTasks(finalizedTasks);
+
       // Update the session in Supabase
       const { error } = await supabase
         .from("focus_sessions")
@@ -945,7 +997,7 @@ export default function FocusTimer({
           is_completed: true,
           // Store session tasks as JSON data
           notes: JSON.stringify({
-            tasks: sessionTasks.map(task => ({
+            tasks: finalizedTasks.map(task => ({
               taskId: task.taskId,
               name: task.name,
               startTime: task.startTime.toISOString(),
@@ -967,7 +1019,7 @@ export default function FocusTimer({
       });
 
       // If there are tasks in this session, update their durations
-      for (const task of sessionTasks) {
+      for (const task of finalizedTasks) {
         // Ensure all tasks have end times
         const taskEndTime = task.endTime || now;
         
@@ -1002,15 +1054,18 @@ export default function FocusTimer({
       setIsActive(false);
       setMinutes(defaultFocusTime);
       setSeconds(0);
-      cleanupTimerState();
+      
+      // Don't clean up state until after we're done with showing task completion
       
       // Increment session count when finished early
       setSessionCount(prevCount => prevCount + 1);
 
       // Only show task completion dialog if we have tasks that aren't all completed
-      if (sessionTasks.length > 0 && !allTasksCompleted) {
+      // and if we have at least one task in the session
+      if (finalizedTasks.length > 0 && !allTasksCompleted) {
         prepareTaskCompletionDialog();
       } else {
+        cleanupTimerState(); // Clean up only if we're not showing the dialog
         toast.success(`¡Sesión completada! Has registrado ${minutesElapsed} minutos de enfoque.`);
         
         // Reset task selection since we don't need the dialog
@@ -1033,6 +1088,7 @@ export default function FocusTimer({
     } catch (error) {
       console.error("Error al finalizar la sesión:", error);
       toast.error(error instanceof Error ? error.message : "Error al finalizar la sesión");
+      cleanupTimerState(); // Make sure we clean up state even if there's an error
     } finally {
       setLoading(false);
     }
@@ -1422,7 +1478,7 @@ export default function FocusTimer({
                               {task.name}
                             </span>
                           </div>
-                          <span className="text-gray-400">En progreso...</span>
+                          <span className="text-gray-400">activa</span>
                         </div>
                       ))
                     }
@@ -1469,80 +1525,77 @@ export default function FocusTimer({
         </CardContent>
       </Card>
 
-      {/* Task Complete Dialog */}
       <Dialog open={showTaskCompleteDialog} onOpenChange={setShowTaskCompleteDialog}>
         <DialogContent className="bg-[#1a1a2e] border-gray-800 text-white">
           <DialogHeader>
             <DialogTitle>
-              {taskDialogStep === 'selection' 
-                ? "Completar Tareas" 
-                : "Confirmación"}
+              Completar Tarea{Object.keys(taskCompletionStates).length > 1 ? 's' : ''}
             </DialogTitle>
             <DialogDescription className="text-gray-400">
-              {taskDialogStep === 'selection'
-                ? "Selecciona las tareas que has completado durante esta sesión"
-                : "¿Confirmas que quieres marcar estas tareas como completadas?"}
+              {Object.keys(taskCompletionStates).length === 1 ? 
+                `¿Deseas marcar "${
+                  sessionTasks.find(t => t.taskId === Object.keys(taskCompletionStates)[0])?.name || 'esta tarea'
+                }" como completada?` : 
+                "Selecciona las tareas que has completado durante esta sesión"
+              }
             </DialogDescription>
           </DialogHeader>
 
-          {taskDialogStep === 'selection' && (
-            <div className="mt-4 space-y-2 max-h-60 overflow-y-auto">
-              {/* Group tasks by ID to show unique tasks with their total time */}
-              {Object.entries(
-                sessionTasks.reduce((acc: {[key: string]: {id: string, name: string, totalMinutes: number, completed: boolean}}, task) => {
-                  if (!acc[task.taskId]) {
-                    acc[task.taskId] = {
-                      id: task.taskId,
-                      name: task.name,
-                      totalMinutes: 0,
-                      completed: task.completed
-                    };
-                  }
-                  
-                  // Calculate minutes for this task instance - ensure at least 1 minute
-                  const endTime = task.endTime || new Date();
-                  const minutes = Math.max(1, Math.round((endTime.getTime() - task.startTime.getTime()) / 60000));
-                  
-                  // Add to total
-                  acc[task.taskId].totalMinutes += minutes;
-                  // If any instance is completed, mark the task as completed
-                  acc[task.taskId].completed = acc[task.taskId].completed || task.completed;
-                  
-                  return acc;
-                }, {})
-              ).map(([taskId, taskInfo]) => (
-                <div 
-                  key={taskId}
-                  className={`p-3 rounded-md flex items-center justify-between ${
-                    taskInfo.completed ? 'bg-green-900/20 border border-green-900/50' : 'bg-[#262638]'
-                  }`}
-                >
-                  <div className="flex items-center">
-                    <input
-                      type="checkbox"
-                      id={`task-${taskId}`}
-                      checked={taskCompletionStates[taskId] || false}
-                      onChange={(e) => handleTaskCheckboxChange(taskId, e.target.checked)}
-                      className="h-4 w-4 bg-[#353545] border-gray-700 rounded mr-3 focus:ring-purple-600"
-                      disabled={taskInfo.completed || loading}
-                    />
-                    <div>
-                      <label 
-                        htmlFor={`task-${taskId}`}
-                        className={`font-medium ${taskInfo.completed ? 'text-green-400 line-through' : 'text-white'}`}
-                      >
-                        {taskInfo.name}
-                      </label>
-                      <p className="text-xs text-gray-400">
-                        {taskInfo.totalMinutes} minutos de trabajo
-                        {taskInfo.completed && " · Completada"}
-                      </p>
+          {/* Task list section */}
+          <div className="mt-4 space-y-2 max-h-60 overflow-y-auto">
+            {/* Check if there are any task IDs in the taskCompletionStates */}
+            {Object.keys(taskCompletionStates).length > 0 ? (
+              // Map through each task ID and render the task
+              Object.keys(taskCompletionStates).map(taskId => {
+                // Find the task in the session tasks
+                const tasksWithThisId = sessionTasks.filter(t => t.taskId === taskId);
+                if (tasksWithThisId.length === 0) return null;
+                
+                // Get the most recent instance of this task
+                const task = tasksWithThisId[tasksWithThisId.length - 1];
+                
+                // Calculate total minutes for this task across all instances
+                const totalMinutes = tasksWithThisId.reduce((total, t) => {
+                  const endTime = t.endTime || new Date();
+                  const minutes = Math.max(1, Math.round((endTime.getTime() - t.startTime.getTime()) / 60000));
+                  return total + minutes;
+                }, 0);
+                
+                return (
+                  <div 
+                    key={taskId}
+                    className="p-3 rounded-md flex items-center justify-between bg-[#262638]"
+                  >
+                    <div className="flex items-center">
+                      <input
+                        type="checkbox"
+                        id={`task-${taskId}`}
+                        checked={taskCompletionStates[taskId] || false}
+                        onChange={(e) => handleTaskCheckboxChange(taskId, e.target.checked)}
+                        className="h-4 w-4 bg-[#353545] border-gray-700 rounded mr-3 focus:ring-purple-600"
+                        disabled={loading}
+                      />
+                      <div>
+                        <label 
+                          htmlFor={`task-${taskId}`}
+                          className="font-medium text-white"
+                        >
+                          {task.name}
+                        </label>
+                        <p className="text-xs text-gray-400">
+                          {totalMinutes} minutos de trabajo
+                        </p>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
-            </div>
-          )}
+                );
+              })
+            ) : (
+              <div className="text-center py-4 text-gray-400">
+                No hay tareas en esta sesión
+              </div>
+            )}
+          </div>
           
           <DialogFooter className="flex justify-between mt-4">
             <Button
@@ -1554,31 +1607,23 @@ export default function FocusTimer({
               Cancelar
             </Button>
             
-            {taskDialogStep === 'selection' ? (
-              <Button
-                onClick={() => handleTaskComplete(true)}
-                className="bg-purple-600 hover:bg-purple-700"
-                disabled={loading || Object.values(taskCompletionStates).every(v => !v)}
-              >
-                {loading ? (
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                ) : (
-                  <CheckCircle2 className="h-4 w-4 mr-2" />
-                )}
-                Completar Seleccionadas
-              </Button>
-            ) : (
-              <Button
-                onClick={() => handleTaskComplete(true)}
-                className="bg-purple-600 hover:bg-purple-700"
-                disabled={loading}
-              >
-                {loading ? (
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                ) : "Confirmar"
-                }
-              </Button>
-            )}
+            <Button
+              onClick={() => handleTaskComplete(true)}
+              className="bg-purple-600 hover:bg-purple-700"
+              disabled={loading || Object.keys(taskCompletionStates).length === 0 || 
+                     (Object.keys(taskCompletionStates).length > 0 && 
+                      Object.values(taskCompletionStates).every(v => !v))}
+            >
+              {loading ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <CheckCircle2 className="h-4 w-4 mr-2" />
+              )}
+              {Object.keys(taskCompletionStates).length === 1 ? 
+                "Completar Tarea" : 
+                "Completar Seleccionadas"
+              }
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
