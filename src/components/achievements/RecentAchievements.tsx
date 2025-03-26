@@ -5,18 +5,20 @@ import { Trophy, ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { iconMap } from "@/lib/achievement-icons";
 import { AchievementWithProgress } from "@/lib/supabase/database.types";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface RecentAchievementsProps {
   achievements: AchievementWithProgress[];
+  isLoading?: boolean;
 }
 
-export default function RecentAchievements({ achievements }: RecentAchievementsProps) {
+export default function RecentAchievements({ achievements, isLoading = false }: RecentAchievementsProps) {
   // Get the total count of available achievements
   const totalAchievements = achievements.length;
-  
+
   // Count how many achievements have been unlocked
   const unlockedCount = achievements.filter(a => a.unlocked).length;
-  
+
   // Find the next achievements to unlock (those not unlocked but with progress > 0)
   const inProgressAchievements = achievements
     .filter(a => !a.unlocked && a.progress > 0)
@@ -27,7 +29,7 @@ export default function RecentAchievements({ achievements }: RecentAchievementsP
       return bPercentage - aPercentage;
     })
     .slice(0, 3);
-  
+
   // Get the most recently unlocked achievements (max 3)
   const recentUnlocked = achievements
     .filter(a => a.unlocked && a.unlocked_at)
@@ -41,6 +43,37 @@ export default function RecentAchievements({ achievements }: RecentAchievementsP
   // Determine what to display based on unlocked and in-progress achievements
   const hasUnlocked = recentUnlocked.length > 0;
   const hasInProgress = inProgressAchievements.length > 0;
+
+  // Render loading skeleton
+  if (isLoading) {
+    return (
+      <Card className="bg-[#1a1a2e] border-gray-800">
+        <CardHeader className="pb-2">
+          <div className="flex justify-between items-center">
+            <div>
+              <CardTitle className="text-white">Logros</CardTitle>
+              <CardDescription className="text-gray-400 mt-2">
+                <Skeleton className="h-4 w-48" />
+              </CardDescription>
+            </div>
+            <Skeleton className="h-9 w-20" />
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-5">
+            <div>
+              <Skeleton className="h-4 w-32 mb-2" />
+              <div className="space-y-3">
+                {[1, 2, 3].map((i) => (
+                  <Skeleton key={i} className="h-16 w-full" />
+                ))}
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   if (!hasUnlocked && !hasInProgress) {
     // No unlocked or in-progress achievements
@@ -94,7 +127,7 @@ export default function RecentAchievements({ achievements }: RecentAchievementsP
               <div className="space-y-3">
                 {recentUnlocked.map((achievement) => {
                   const IconComponent = iconMap[achievement.icon_name as keyof typeof iconMap] || iconMap.Trophy;
-                  
+
                   return (
                     <div key={achievement.id} className="flex items-center gap-3 p-2 rounded-md bg-[#262638]">
                       <div className="bg-purple-900/40 text-purple-300 p-2 rounded-full">
@@ -119,7 +152,7 @@ export default function RecentAchievements({ achievements }: RecentAchievementsP
                 {inProgressAchievements.map((achievement) => {
                   const IconComponent = iconMap[achievement.icon_name as keyof typeof iconMap] || iconMap.Trophy;
                   const progressPercentage = Math.round((achievement.progress / achievement.requirement_value) * 100);
-                  
+
                   return (
                     <div key={achievement.id} className="flex items-center gap-3 p-2 rounded-md bg-[#262638]">
                       <div className="bg-gray-800/80 text-gray-400 p-2 rounded-full">
@@ -133,8 +166,8 @@ export default function RecentAchievements({ achievements }: RecentAchievementsP
                         <p className="text-gray-400 text-sm">{achievement.description}</p>
                         <p className="text-gray-500 text-xs mt-1">Progreso: {achievement.progress}/{achievement.requirement_value}</p>
                         <div className="w-full h-1.5 bg-gray-700 rounded-full mt-1">
-                          <div 
-                            className="h-full bg-purple-600 rounded-full" 
+                          <div
+                            className="h-full bg-purple-600 rounded-full"
                             style={{ width: `${progressPercentage}%` }}
                           ></div>
                         </div>

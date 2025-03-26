@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { PlusCircle, CheckCircle, BookOpen } from "lucide-react";
+import { PlusCircle, CheckCircle, BookOpen, Loader2 } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -11,15 +11,9 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
-
-type Task = {
-  id: string;
-  name: string;
-  status: string;
-  created_at: string;
-  deleted?: boolean;
-};
+import { Task } from "@/lib/supabase/database.types";
 
 interface TaskSelectionProps {
   recentTasks: Task[];
@@ -29,6 +23,7 @@ interface TaskSelectionProps {
   setCustomTaskName: (name: string) => void;
   setCurrentTask: (task: Task | null) => void;
   disabled?: boolean;
+  isLoading?: boolean;
 }
 
 const CompactTaskSelection: React.FC<TaskSelectionProps> = ({
@@ -38,7 +33,8 @@ const CompactTaskSelection: React.FC<TaskSelectionProps> = ({
   setSelectedTaskId,
   setCustomTaskName,
   setCurrentTask,
-  disabled = false
+  disabled = false,
+  isLoading = false
 }) => {
   const [isNewTaskMode, setIsNewTaskMode] = useState(false);
   const [pendingTasks, setPendingTasks] = useState<Task[]>([]);
@@ -89,6 +85,11 @@ const CompactTaskSelection: React.FC<TaskSelectionProps> = ({
       ? customTaskName
       : "Selecciona una tarea";
 
+  // Loading state
+  if (isLoading) {
+    return <Skeleton className="h-9 w-full" />;
+  }
+
   return (
     <div className="w-full">
       {isNewTaskMode ? (
@@ -126,7 +127,11 @@ const CompactTaskSelection: React.FC<TaskSelectionProps> = ({
                 <BookOpen className="mr-2 h-4 w-4 text-gray-400 flex-shrink-0" />
                 <span className="truncate">{displayedTaskName}</span>
               </span>
-              <PlusCircle className="ml-2 h-4 w-4 flex-shrink-0 opacity-50" />
+              {disabled ? (
+                <Loader2 className="ml-2 h-4 w-4 flex-shrink-0 animate-spin" />
+              ) : (
+                <PlusCircle className="ml-2 h-4 w-4 flex-shrink-0 opacity-50" />
+              )}
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent className="w-[300px] bg-[#262638] border-gray-700 text-white">

@@ -7,34 +7,46 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Progress } from "@/components/ui/progress";
-import { InfoIcon, LockIcon } from "lucide-react";
+import { InfoIcon, LockIcon, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { AchievementWithProgress } from "@/lib/supabase/database.types";
+import { AchievementWithProgress, Profile } from "@/lib/supabase/database.types";
 import { supabase } from "@/lib/supabase/client";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { iconMap } from "@/lib/achievement-icons";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface AchievementsClientProps {
   initialAchievements: AchievementWithProgress[];
-  profile: any;
+  profile: Profile;
 }
 
-export default function AchievementsClient({ 
+export default function AchievementsClient({
   initialAchievements,
   profile
 }: AchievementsClientProps) {
   const [achievements, setAchievements] = useState<AchievementWithProgress[]>(initialAchievements);
   const [activeTab, setActiveTab] = useState<string>("all");
   const [loading, setLoading] = useState<boolean>(false);
+  const [initialLoading, setInitialLoading] = useState<boolean>(true);
+
+  // When initial data is loaded, stop showing the initial loading state
+  useEffect(() => {
+    if (initialAchievements.length > 0) {
+      setInitialLoading(false);
+    } else {
+      // If no achievements provided, load them
+      refreshAchievements();
+    }
+  }, [initialAchievements]);
 
   // Count unlocked achievements
   const unlockedCount = achievements.filter(a => a.unlocked).length;
   const totalCount = achievements.length;
 
   // Filter achievements based on the active tab
-  const filteredAchievements = activeTab === "all" 
-    ? achievements 
+  const filteredAchievements = activeTab === "all"
+    ? achievements
     : achievements.filter(a => a.category === activeTab);
 
   // Group achievements by category for better display
@@ -50,7 +62,7 @@ export default function AchievementsClient({
     try {
       setLoading(true);
       const { data: { user } } = await supabase.auth.getUser();
-      
+
       if (!user) {
         throw new Error("Usuario no autenticado");
       }
@@ -96,6 +108,7 @@ export default function AchievementsClient({
       console.error("Error refreshing achievements:", error);
     } finally {
       setLoading(false);
+      setInitialLoading(false);
     }
   };
 
@@ -122,12 +135,38 @@ export default function AchievementsClient({
     };
   }, [profile?.id]);
 
+  // Render skeleton screens while loading
+  if (initialLoading) {
+    return (
+      <div className="container mx-auto py-8 max-w-7xl">
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-white mb-2">Logros</h1>
+          <p className="text-gray-400">Desbloquea logros a medida que utilizas la aplicación y mejoras tu productividad</p>
+
+          <div className="mt-4 flex flex-col md:flex-row gap-4">
+            <Skeleton className="bg-[#1a1a2e] h-32 flex-1" />
+            <Skeleton className="bg-[#1a1a2e] h-32 flex-1" />
+            <Skeleton className="bg-[#1a1a2e] h-32 flex-1" />
+          </div>
+        </div>
+
+        <Skeleton className="bg-[#1a1a2e] h-10 w-80 mb-6" />
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {[...Array(6)].map((_, i) => (
+            <Skeleton key={i} className="bg-[#1a1a2e] h-44" />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="container mx-auto py-8 max-w-7xl">
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-white mb-2">Logros</h1>
         <p className="text-gray-400">Desbloquea logros a medida que utilizas la aplicación y mejoras tu productividad</p>
-        
+
         <div className="mt-4 flex flex-col md:flex-row gap-4">
           <Card className="bg-[#1a1a2e] border-gray-800 flex-1">
             <CardHeader className="pb-2">
@@ -140,8 +179,8 @@ export default function AchievementsClient({
                   <span className="text-gray-300 text-sm">{unlockedCount} de {totalCount}</span>
                   <span className="text-purple-400 text-sm">{Math.round((unlockedCount / totalCount) * 100)}%</span>
                 </div>
-                <Progress 
-                  value={(unlockedCount / totalCount) * 100} 
+                <Progress
+                  value={(unlockedCount / totalCount) * 100}
                   className="h-2 bg-gray-700"
                 />
               </div>
@@ -181,6 +220,13 @@ export default function AchievementsClient({
           <TabsTrigger value="technique">Técnicas</TabsTrigger>
         </TabsList>
 
+        {loading &&
+          <div className="flex justify-center items-center my-8">
+            <Loader2 className="h-8 w-8 text-purple-400 animate-spin mr-2" />
+            <span className="text-gray-300">Actualizando logros...</span>
+          </div>
+        }
+
         <TabsContent value="all" className="space-y-6">
           {Object.entries(achievementsByCategory).map(([category, categoryAchievements]) => (
             categoryAchievements.length > 0 && (
@@ -203,33 +249,57 @@ export default function AchievementsClient({
 
         <TabsContent value="daily" className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredAchievements.map(achievement => (
-              <AchievementCard key={achievement.id} achievement={achievement} />
-            ))}
+            {filteredAchievements.length > 0 ? (
+              filteredAchievements.map(achievement => (
+                <AchievementCard key={achievement.id} achievement={achievement} />
+              ))
+            ) : (
+              <div className="col-span-3 text-center py-8 text-gray-400">
+                No hay logros en esta categoría
+              </div>
+            )}
           </div>
         </TabsContent>
 
         <TabsContent value="streak" className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredAchievements.map(achievement => (
-              <AchievementCard key={achievement.id} achievement={achievement} />
-            ))}
+            {filteredAchievements.length > 0 ? (
+              filteredAchievements.map(achievement => (
+                <AchievementCard key={achievement.id} achievement={achievement} />
+              ))
+            ) : (
+              <div className="col-span-3 text-center py-8 text-gray-400">
+                No hay logros en esta categoría
+              </div>
+            )}
           </div>
         </TabsContent>
 
         <TabsContent value="total" className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredAchievements.map(achievement => (
-              <AchievementCard key={achievement.id} achievement={achievement} />
-            ))}
+            {filteredAchievements.length > 0 ? (
+              filteredAchievements.map(achievement => (
+                <AchievementCard key={achievement.id} achievement={achievement} />
+              ))
+            ) : (
+              <div className="col-span-3 text-center py-8 text-gray-400">
+                No hay logros en esta categoría
+              </div>
+            )}
           </div>
         </TabsContent>
 
         <TabsContent value="technique" className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredAchievements.map(achievement => (
-              <AchievementCard key={achievement.id} achievement={achievement} />
-            ))}
+            {filteredAchievements.length > 0 ? (
+              filteredAchievements.map(achievement => (
+                <AchievementCard key={achievement.id} achievement={achievement} />
+              ))
+            ) : (
+              <div className="col-span-3 text-center py-8 text-gray-400">
+                No hay logros en esta categoría
+              </div>
+            )}
           </div>
         </TabsContent>
       </Tabs>
@@ -241,15 +311,15 @@ export default function AchievementsClient({
 function AchievementCard({ achievement }: { achievement: AchievementWithProgress }) {
   // Get the appropriate icon based on the icon name
   const IconComponent = iconMap[achievement.icon_name as keyof typeof iconMap] || iconMap.Trophy;
-  
+
   // Format unlocked date if available
-  const formattedDate = achievement.unlocked_at 
+  const formattedDate = achievement.unlocked_at
     ? format(new Date(achievement.unlocked_at), 'dd/MM/yyyy', { locale: es })
     : null;
 
   // Calculate progress percentage
   const progressPercentage = Math.min(
-    100, 
+    100,
     Math.round((achievement.progress / achievement.requirement_value) * 100)
   );
 
@@ -263,8 +333,8 @@ function AchievementCard({ achievement }: { achievement: AchievementWithProgress
           <div className="flex gap-3 items-center">
             <div className={cn(
               "flex items-center justify-center rounded-full p-3",
-              achievement.unlocked 
-                ? "bg-purple-900/40 text-purple-300" 
+              achievement.unlocked
+                ? "bg-purple-900/40 text-purple-300"
                 : "bg-gray-800/50 text-gray-400"
             )}>
               <IconComponent className="h-6 w-6" />
@@ -281,7 +351,7 @@ function AchievementCard({ achievement }: { achievement: AchievementWithProgress
               </CardDescription>
             </div>
           </div>
-          
+
           {!achievement.unlocked && (
             <div className="text-gray-600">
               <LockIcon className="h-5 w-5" />
@@ -290,14 +360,14 @@ function AchievementCard({ achievement }: { achievement: AchievementWithProgress
         </div>
 
         {achievement.unlocked && (
-          <Badge 
+          <Badge
             className="absolute top-3 right-6 bg-purple-600 hover:bg-purple-700"
           >
             Desbloqueado
           </Badge>
         )}
       </CardHeader>
-      
+
       <CardContent>
         <div className="space-y-2">
           <div className="flex justify-between items-center">
@@ -308,7 +378,7 @@ function AchievementCard({ achievement }: { achievement: AchievementWithProgress
               )}>
                 Progreso: {achievement.progress}/{achievement.requirement_value}
               </span>
-              
+
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger asChild>
@@ -327,13 +397,13 @@ function AchievementCard({ achievement }: { achievement: AchievementWithProgress
             </div>
             <span className="text-xs text-gray-500">{progressPercentage}%</span>
           </div>
-          
-          <Progress 
-            value={progressPercentage} 
+
+          <Progress
+            value={progressPercentage}
             className={cn(
               "h-2",
-              achievement.unlocked 
-                ? "bg-gray-700" 
+              achievement.unlocked
+                ? "bg-gray-700"
                 : "bg-gray-800"
             )}
           />

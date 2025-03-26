@@ -1,4 +1,4 @@
-// Updated src/lib/supabase/database.types.ts
+// src/lib/supabase/database.types.ts
 export type Json =
   | string
   | number
@@ -378,10 +378,37 @@ export interface Database {
   }
 }
 
-// Achievement types for frontend use
+// Exported types for more convenient usage across the app
+
+// Profile type
+export type Profile = Database['public']['Tables']['profiles']['Row'];
+
+// Task type
+export type Task = Database['public']['Tables']['tasks']['Row'];
+
+// FocusSession type
+export type FocusSession = Database['public']['Tables']['focus_sessions']['Row'] & {
+  task?: Pick<Task, 'name'>;
+};
+
+// TimerSettings type
+export type TimerSettings = Database['public']['Tables']['timer_settings']['Row'] & {
+  technique?: Pick<TimeManagementTechnique, 'name' | 'description'>;
+};
+
+// TimeManagementTechnique type
+export type TimeManagementTechnique = Database['public']['Tables']['time_management_techniques']['Row'];
+
+// StudyRoom type
+export type StudyRoom = Database['public']['Tables']['study_rooms']['Row'];
+
+// RoomParticipant type
+export type RoomParticipant = Database['public']['Tables']['room_participants']['Row'];
+
+// Achievement types
 export type Achievement = Database['public']['Tables']['achievements']['Row'];
 export type UserAchievement = Database['public']['Tables']['user_achievements']['Row'] & {
-  achievement: Achievement
+  achievement: Achievement;
 };
 
 // Achievement with progress information
@@ -394,8 +421,8 @@ export type AchievementWithProgress = Achievement & {
 // DailyActivity type for heatmap
 export type DailyActivity = Database['public']['Tables']['daily_activity']['Row'];
 
-// Enhanced Profile type
-export type ProfileWithLevel = Database['public']['Tables']['profiles']['Row'] & {
+// Enhanced Profile type with level information
+export type ProfileWithLevel = Profile & {
   levelProgress: number;
   nextLevel?: string;
   nextLevelThreshold?: number;

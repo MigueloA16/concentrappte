@@ -10,7 +10,8 @@ import {
   CheckCircle2,
   XCircle,
   Coffee,
-  RotateCcw
+  RotateCcw,
+  Loader2
 } from "lucide-react";
 import {
   Dialog,
@@ -24,13 +25,8 @@ import { supabase } from "@/lib/supabase/client";
 import { toast } from "sonner";
 import CompactTaskSelection from "./CompactTaskSelection";
 import AudioPlayer from "@/components/audio/AudioPlayer";
-
-type Task = {
-  id: string;
-  name: string;
-  status: string;
-  created_at: string;
-};
+import { Task } from "@/lib/supabase/database.types";
+import { Skeleton } from "@/components/ui/skeleton";
 
 type FocusTimerProps = {
   defaultFocusTime: number;
@@ -68,6 +64,7 @@ export default function FocusTimer({
   const [currentTask, setCurrentTask] = useState<Task | null>(null);
   const [sessionCompleted, setSessionCompleted] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [initializing, setInitializing] = useState(true);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
@@ -75,17 +72,22 @@ export default function FocusTimer({
   useEffect(() => {
     audioRef.current = new Audio("/sounds/bell.mp3");
 
-    // Add this check to prevent auto-play when component mounts
+    // Check for saved timer state
     const savedState = localStorage.getItem('timerState');
     if (savedState) {
-      const state = JSON.parse(savedState);
-      if (!state.isActive) {
-        // If timer isn't active, make sure audio won't play automatically
-        if (audioRef.current) {
+      try {
+        const state = JSON.parse(savedState);
+        if (!state.isActive && audioRef.current) {
           audioRef.current.pause();
         }
+      } catch (error) {
+        console.error("Error parsing saved timer state:", error);
       }
     }
+
+    setTimeout(() => {
+      setInitializing(false);
+    }, 500);
 
     return () => {
       if (audioRef.current) {
@@ -104,7 +106,7 @@ export default function FocusTimer({
 
       if (savedTask && autoStart === 'true') {
         try {
-          const task = JSON.parse(savedTask);
+          const task = JSON.parse(savedTask) as Task;
           console.log("Auto-start detected with task:", task.name);
 
           // Set task info first
@@ -116,6 +118,7 @@ export default function FocusTimer({
           setTimeout(async () => {
             try {
               console.log("Auto-starting session for task:", task.name);
+              setLoading(true);
 
               // Get current user
               const { data: { user } } = await supabase.auth.getUser();
@@ -177,6 +180,7 @@ export default function FocusTimer({
               // Clean up localStorage after attempt
               localStorage.removeItem('selectedTask');
               localStorage.removeItem('autoStartSession');
+              setLoading(false);
             }
           }, 800); // Longer delay for more reliable state updates
         } catch (error) {
@@ -184,30 +188,24 @@ export default function FocusTimer({
           localStorage.removeItem('selectedTask');
           localStorage.removeItem('autoStartSession');
         }
+      } else {
+        // Regular task handling without auto-start
+        if (savedTask && !isActive && !currentSessionId) {
+          try {
+            const task = JSON.parse(savedTask) as Task;
+            setSelectedTaskId(task.id);
+            setCurrentTask(task);
+            setCustomTaskName(task.name || "");
+            localStorage.removeItem('selectedTask'); // Clear it after use
+          } catch (error) {
+            console.error("Error parsing saved task:", error);
+          }
+        }
       }
     };
 
     handleAutoStart();
   }, []); // Run once on mount with empty dependency array
-
-  // Regular task handling without auto-start
-  useEffect(() => {
-    const savedTask = localStorage.getItem('selectedTask');
-    const autoStart = localStorage.getItem('autoStartSession');
-
-    // Only handle the saved task if not auto-starting
-    if (savedTask && !autoStart && !isActive && !currentSessionId) {
-      try {
-        const task = JSON.parse(savedTask);
-        setSelectedTaskId(task.id);
-        setCurrentTask(task);
-        setCustomTaskName(task.name || "");
-        localStorage.removeItem('selectedTask'); // Clear it after use
-      } catch (error) {
-        console.error("Error parsing saved task:", error);
-      }
-    }
-  }, [isActive, currentSessionId]);
 
   // Load timer state on component mount
   useEffect(() => {
@@ -409,7 +407,9 @@ export default function FocusTimer({
             user_id: user.id,
             name: customTaskName.trim(),
             status: "in_progress", // Set status to in_progress directly for new tasks
-            deleted: false
+            deleted: false,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
           })
           .select()
           .single();
@@ -577,6 +577,8 @@ export default function FocusTimer({
     if (!currentSessionId || isBreak) return;
 
     try {
+      setLoading(true);
+
       // Calculate the time spent so far
       const startTimeObj = startTime ? new Date(startTime) : null;
       if (!startTimeObj) {
@@ -653,6 +655,8 @@ export default function FocusTimer({
     } catch (error) {
       console.error("Error al finalizar la sesión:", error);
       toast.error(error instanceof Error ? error.message : "Error al finalizar la sesión");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -726,6 +730,38 @@ export default function FocusTimer({
       toast.error(error instanceof Error ? error.message : "Error al completar la sesión");
     }
   };
+
+  if (initializing) {
+    return (
+      <Card className="w-full bg-[#1a1a2e] border-gray-800">
+        <CardHeader className="text-center">
+          <CardTitle className="text-white">
+            Cargando Temporizador
+          </CardTitle>
+          <CardDescription className="text-purple-400">
+            Preparando tu entorno de enfoque...
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-col items-center py-6">
+          <div className="relative mb-8">
+            <Skeleton className="w-64 h-64 rounded-full" />
+            <div className="flex justify-center mt-4 space-x-2">
+              {Array.from({ length: defaultTargetSessions }).map((_, index) => (
+                <Skeleton key={index} className="w-3 h-3 rounded-full" />
+              ))}
+            </div>
+          </div>
+          <div className="flex flex-col items-center w-full max-w-md mx-auto">
+            <Skeleton className="w-full h-10 rounded-md mb-4" />
+            <Skeleton className="w-full h-10 rounded-md" />
+            <div className="mt-6 w-full flex justify-center">
+              <Skeleton className="w-80 h-10 rounded-full" />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <>
@@ -811,6 +847,7 @@ export default function FocusTimer({
                     onClick={startBreak}
                     size="sm"
                     className="bg-purple-600 hover:bg-purple-700 text-xs"
+                    disabled={loading}
                   >
                     <Coffee className="h-4 w-4 mr-2" />
                     Comenzar Descanso
@@ -820,6 +857,7 @@ export default function FocusTimer({
                     onClick={skipBreak}
                     size="sm"
                     className="border-gray-600 text-xs"
+                    disabled={loading}
                   >
                     <RotateCcw className="h-4 w-4 mr-2" />
                     Omitir Descanso
@@ -848,13 +886,18 @@ export default function FocusTimer({
                     onClick={startTimer}
                     disabled={(!selectedTaskId && !customTaskName.trim()) || loading}
                   >
-                    <Play className="h-4 w-4 mr-2 flex-shrink-0" />
+                    {loading ? (
+                      <Loader2 className="h-4 w-4 mr-2 flex-shrink-0 animate-spin" />
+                    ) : (
+                      <Play className="h-4 w-4 mr-2 flex-shrink-0" />
+                    )}
                     <span className="text-sm">Comenzar</span>
                   </Button>
                   <Button
                     variant="outline"
                     onClick={resetTimer}
                     className="border-gray-700 text-gray-400 hover:bg-gray-800 hover:text-white min-w-9 h-9 p-0 flex items-center justify-center flex-shrink-0"
+                    disabled={loading}
                   >
                     <RotateCcw className="h-4 w-4" />
                   </Button>
@@ -868,6 +911,7 @@ export default function FocusTimer({
                   variant="outline"
                   onClick={pauseTimer}
                   className="border-purple-700 text-purple-400 hover:bg-purple-900/20 flex-1 h-9"
+                  disabled={loading}
                 >
                   <Pause className="h-4 w-4 mr-2 flex-shrink-0" />
                   <span className="text-sm">Pausar</span>
@@ -876,6 +920,7 @@ export default function FocusTimer({
                   variant="outline"
                   onClick={resetTimer}
                   className="border-gray-700 text-gray-400 hover:bg-gray-800 hover:text-white min-w-9 h-9 p-0 flex items-center justify-center flex-shrink-0"
+                  disabled={loading}
                 >
                   <RotateCcw className="h-4 w-4" />
                 </Button>
@@ -886,8 +931,13 @@ export default function FocusTimer({
                     variant="outline"
                     onClick={finishEarly}
                     className="border-green-700 text-green-400 hover:bg-green-900/20 flex-1 h-9"
+                    disabled={loading}
                   >
-                    <StopCircle className="h-4 w-4 mr-2 flex-shrink-0" />
+                    {loading ? (
+                      <Loader2 className="h-4 w-4 mr-2 flex-shrink-0 animate-spin" />
+                    ) : (
+                      <StopCircle className="h-4 w-4 mr-2 flex-shrink-0" />
+                    )}
                     <span className="text-sm">Finalizar</span>
                   </Button>
                 )}
@@ -921,14 +971,20 @@ export default function FocusTimer({
               <Button
                 onClick={() => handleTaskComplete(true)}
                 className="flex-1 bg-purple-600 hover:bg-purple-700"
+                disabled={loading}
               >
-                <CheckCircle2 className="h-4 w-4 mr-2" />
+                {loading ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <CheckCircle2 className="h-4 w-4 mr-2" />
+                )}
                 Sí, completada
               </Button>
               <Button
                 onClick={() => handleTaskComplete(false)}
                 variant="outline"
                 className="flex-1 border-gray-600"
+                disabled={loading}
               >
                 <XCircle className="h-4 w-4 mr-2" />
                 No, continuar
@@ -938,8 +994,12 @@ export default function FocusTimer({
 
           {!currentTask && (
             <DialogFooter>
-              <Button onClick={() => handleTaskComplete(false)}>
-                Seleccionar nueva tarea
+              <Button onClick={() => handleTaskComplete(false)} disabled={loading}>
+                {loading ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  "Seleccionar nueva tarea"
+                )}
               </Button>
             </DialogFooter>
           )}

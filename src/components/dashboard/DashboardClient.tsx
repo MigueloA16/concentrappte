@@ -1,7 +1,7 @@
-// src/components/dashboard/DashboardClient.tsx with updated heatmap
+// src/components/dashboard/DashboardClient.tsx
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
@@ -10,8 +10,7 @@ import { supabase } from "@/lib/supabase/client";
 import { toast } from "sonner";
 import { format, subDays, isToday, startOfYear, eachDayOfInterval } from "date-fns";
 import RecentAchievements from "@/components/achievements/RecentAchievements";
-import { AchievementWithProgress } from "@/lib/supabase/database.types";
-import { ActivityHeatmap } from "@/components/dashboard/ActivityHeatmap"; // Import the new component
+import { ActivityHeatmap } from "@/components/dashboard/ActivityHeatmap";
 import { 
   Trophy, 
   Edit2, 
@@ -21,8 +20,15 @@ import {
   BarChart, 
   Target,
   Flame,
-  Award
+  Award,
+  Loader2
 } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
+import { 
+  ProfileWithLevel, 
+  DailyActivity, 
+  AchievementWithProgress 
+} from "@/lib/supabase/database.types";
 
 // Define level thresholds in minutes
 const LEVELS = [
@@ -34,7 +40,7 @@ const LEVELS = [
 ];
 
 // Get user level based on total minutes
-const getUserLevel = (totalMinutes) => {
+const getUserLevel = (totalMinutes: number) => {
   let level = LEVELS[0];
   for (let i = 1; i < LEVELS.length; i++) {
     if (totalMinutes >= LEVELS[i].threshold) {
@@ -47,7 +53,7 @@ const getUserLevel = (totalMinutes) => {
 };
 
 // Get progress to next level
-const getProgressToNextLevel = (totalMinutes) => {
+const getProgressToNextLevel = (totalMinutes: number) => {
   const currentLevel = getUserLevel(totalMinutes);
   const currentLevelIndex = LEVELS.findIndex(level => level.name === currentLevel.name);
   const isMaxLevel = currentLevelIndex === LEVELS.length - 1;
@@ -62,7 +68,7 @@ const getProgressToNextLevel = (totalMinutes) => {
 };
 
 // Get next level info
-const getNextLevelInfo = (totalMinutes) => {
+const getNextLevelInfo = (totalMinutes: number) => {
   const currentLevel = getUserLevel(totalMinutes);
   const currentLevelIndex = LEVELS.findIndex(level => level.name === currentLevel.name);
   const isMaxLevel = currentLevelIndex === LEVELS.length - 1;
@@ -75,18 +81,6 @@ const getNextLevelInfo = (totalMinutes) => {
   return { name: nextLevel.name, minutesNeeded };
 };
 
-type Profile = {
-  id: string;
-  username: string;
-  total_focus_time: number;
-  streak_days: number;
-  best_streak: number;
-  avatar_url?: string;
-  daily_motivation?: string;
-  target_hours?: number;
-  level_name?: string;
-};
-
 type FocusSession = {
   id: string;
   duration_minutes: number;
@@ -95,14 +89,8 @@ type FocusSession = {
   task?: { name: string };
 };
 
-type DailyActivity = {
-  date: string;
-  total_minutes: number;
-  sessions_count: number;
-};
-
 interface DashboardClientProps {
-  initialProfile: Profile;
+  initialProfile: ProfileWithLevel;
   initialRecentSessions: FocusSession[];
   initialAchievements?: AchievementWithProgress[];
 }
@@ -112,11 +100,12 @@ export default function DashboardClient({
   initialRecentSessions,
   initialAchievements = []
 }: DashboardClientProps) {
-  const [profile, setProfile] = useState<Profile>({
+  const [profile, setProfile] = useState<ProfileWithLevel>({
     ...initialProfile,
     daily_motivation: initialProfile.daily_motivation || "Focus on the process, not just the outcome",
     target_hours: initialProfile.target_hours || 100,
-    best_streak: initialProfile.best_streak || 0
+    best_streak: initialProfile.best_streak || 0,
+    levelProgress: 0
   });
   const [recentSessions, setRecentSessions] = useState<FocusSession[]>(initialRecentSessions || []);
   const [achievements, setAchievements] = useState<AchievementWithProgress[]>(initialAchievements);
@@ -131,19 +120,20 @@ export default function DashboardClient({
     last7Days: 0,
     last30Days: 0
   });
+  const [isActivityLoading, setIsActivityLoading] = useState(true);
+  const [isStatsLoading, setIsStatsLoading] = useState(true);
+  const [isAchievementsLoading, setIsAchievementsLoading] = useState(true);
 
   // Get current level info
   const currentLevel = getUserLevel(profile.total_focus_time || 0);
   const levelProgress = getProgressToNextLevel(profile.total_focus_time || 0);
   const nextLevelInfo = getNextLevelInfo(profile.total_focus_time || 0);
 
-  // Tooltip ref
-  const tooltipRef = useRef(null);
-
   // Fetch today's sessions and period stats
   useEffect(() => {
     const fetchStats = async () => {
       try {
+        setIsStatsLoading(true);
         // Get current user
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
@@ -199,6 +189,8 @@ export default function DashboardClient({
 
       } catch (error) {
         console.error("Error fetching stats:", error);
+      } finally {
+        setIsStatsLoading(false);
       }
     };
 
@@ -209,6 +201,7 @@ export default function DashboardClient({
   useEffect(() => {
     const fetchActivityData = async () => {
       try {
+        setIsActivityLoading(true);
         // Get current user
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
@@ -244,7 +237,11 @@ export default function DashboardClient({
           return {
             date: dateStr,
             total_minutes: activity ? activity.total_minutes : 0,
-            sessions_count: activity ? activity.sessions_count : 0
+            sessions_count: activity ? activity.sessions_count : 0,
+            id: '',  // Add required id field for DailyActivity type
+            user_id: user.id, // Add required user_id field
+            created_at: dateStr, // Add required created_at field
+            updated_at: dateStr, // Add required updated_at field
           };
         });
 
@@ -252,11 +249,23 @@ export default function DashboardClient({
 
       } catch (error) {
         console.error("Error fetching activity data:", error);
+      } finally {
+        setIsActivityLoading(false);
       }
     };
 
     fetchActivityData();
   }, []);
+
+  // Load achievements
+  useEffect(() => {
+    setIsAchievementsLoading(achievements.length === 0);
+    
+    // If we already have achievements loaded, we can stop loading
+    if (achievements.length > 0) {
+      setIsAchievementsLoading(false);
+    }
+  }, [achievements]);
 
   // Save motivation text
   const saveMotivation = async () => {
@@ -321,7 +330,7 @@ export default function DashboardClient({
   };
 
   // Format minutes to hours and minutes
-  const formatMinutes = (minutes) => {
+  const formatMinutes = (minutes: number) => {
     const hours = Math.floor(minutes / 60);
     const mins = minutes % 60;
     return `${hours}h:${mins}m`;
@@ -344,60 +353,91 @@ export default function DashboardClient({
           {/* Level section */}
           <CardHeader className="pb-2">
             <div className="flex justify-between items-start">
-              <div className="flex items-center gap-2">
-                {/* Award icon in a circle */}
-                <div className="w-12 h-12 rounded-full flex items-center justify-center bg-[#262638] border-2 border-purple-400">
-                  <Award className="h-6 w-6 text-purple-400" />
-                </div>
-                <div>
+              {isStatsLoading ? (
+                <>
                   <div className="flex items-center gap-2">
-                    <span className="text-purple-400 font-bold">{currentLevel.name}</span>
-                    <span className="text-white">Nivel {LEVELS.findIndex(l => l.name === currentLevel.name) + 1}</span>
+                    <Skeleton className="w-12 h-12 rounded-full" />
+                    <div>
+                      <Skeleton className="w-24 h-5 mb-1" />
+                      <Skeleton className="w-40 h-4" />
+                    </div>
                   </div>
-                  <CardDescription className="text-gray-400">
-                    {nextLevelInfo.name ? 
-                      `${formatMinutes(nextLevelInfo.minutesNeeded)} más para alcanzar el nivel ${nextLevelInfo.name}` : 
-                      "¡Has alcanzado el nivel máximo!"
-                    }
-                  </CardDescription>
-                </div>
-              </div>
-              <div className="text-right">
-                <span className="text-sm text-gray-400">Tiempo Total</span>
-                <div className="text-white font-semibold">{formatMinutes(profile.total_focus_time || 0)}</div>
-              </div>
+                  <div className="text-right">
+                    <Skeleton className="w-20 h-4 mb-1 ml-auto" />
+                    <Skeleton className="w-24 h-5 ml-auto" />
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="flex items-center gap-2">
+                    {/* Award icon in a circle */}
+                    <div className="w-12 h-12 rounded-full flex items-center justify-center bg-[#262638] border-2 border-purple-400">
+                      <Award className="h-6 w-6 text-purple-400" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-purple-400 font-bold">{currentLevel.name}</span>
+                        <span className="text-white">Nivel {LEVELS.findIndex(l => l.name === currentLevel.name) + 1}</span>
+                      </div>
+                      <CardDescription className="text-gray-400">
+                        {nextLevelInfo.name ? 
+                          `${formatMinutes(nextLevelInfo.minutesNeeded)} más para alcanzar el nivel ${nextLevelInfo.name}` : 
+                          "¡Has alcanzado el nivel máximo!"
+                        }
+                      </CardDescription>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-sm text-gray-400">Tiempo Total</span>
+                    <div className="text-white font-semibold">{formatMinutes(profile.total_focus_time || 0)}</div>
+                  </div>
+                </>
+              )}
             </div>
             <div className="space-y-2 mt-2">
               <div className="flex justify-between items-center">
                 <span className="text-sm text-gray-400">Progreso</span>
                 <span className="text-sm text-gray-400">{levelProgress}%</span>
               </div>
-              <Progress 
-                value={levelProgress} 
-                className="h-2 bg-gray-700"
-              />
+              {isStatsLoading ? (
+                <Skeleton className="h-2 w-full" />
+              ) : (
+                <Progress 
+                  value={levelProgress} 
+                  className="h-2 bg-gray-700"
+                />
+              )}
             </div>
             
             {/* Streak info */}
             <div className="mt-4 grid grid-cols-2 gap-2">
-              <div className="bg-[#262638] p-3 rounded-lg text-center">
-                <div className="flex flex-col items-center justify-center">
-                  <div className="flex items-center gap-1">
-                    <Flame className="h-4 w-4 text-purple-400" />
-                    <span className="text-gray-400 text-sm">Racha Actual</span>
+              {isStatsLoading ? (
+                <>
+                  <Skeleton className="h-16 bg-[#262638]" />
+                  <Skeleton className="h-16 bg-[#262638]" />
+                </>
+              ) : (
+                <>
+                  <div className="bg-[#262638] p-3 rounded-lg text-center">
+                    <div className="flex flex-col items-center justify-center">
+                      <div className="flex items-center gap-1">
+                        <Flame className="h-4 w-4 text-purple-400" />
+                        <span className="text-gray-400 text-sm">Racha Actual</span>
+                      </div>
+                      <div className="text-xl font-bold text-purple-400 mt-1">{profile?.streak_days || 0} días</div>
+                    </div>
                   </div>
-                  <div className="text-xl font-bold text-purple-400 mt-1">{profile?.streak_days || 0} días</div>
-                </div>
-              </div>
-              <div className="bg-[#262638] p-3 rounded-lg text-center">
-                <div className="flex flex-col items-center justify-center">
-                  <div className="flex items-center gap-1">
-                    <Trophy className="h-4 w-4 text-purple-400" />
-                    <span className="text-gray-400 text-sm">Mejor Racha</span>
+                  <div className="bg-[#262638] p-3 rounded-lg text-center">
+                    <div className="flex flex-col items-center justify-center">
+                      <div className="flex items-center gap-1">
+                        <Trophy className="h-4 w-4 text-purple-400" />
+                        <span className="text-gray-400 text-sm">Mejor Racha</span>
+                      </div>
+                      <div className="text-xl font-bold text-purple-400 mt-1">{profile?.best_streak || 0} días</div>
+                    </div>
                   </div>
-                  <div className="text-xl font-bold text-purple-400 mt-1">{profile?.best_streak || 0} días</div>
-                </div>
-              </div>
+                </>
+              )}
             </div>
           </CardHeader>
           
@@ -419,7 +459,7 @@ export default function DashboardClient({
                 className="h-8 w-8 p-0"
               >
                 {editingMotivation ? 
-                  <Save className="h-4 w-4 text-green-400" /> : 
+                  (loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4 text-green-400" />) : 
                   <Edit2 className="h-4 w-4 text-gray-400" />
                 }
               </Button>
@@ -431,6 +471,7 @@ export default function DashboardClient({
                   onChange={(e) => setMotivationText(e.target.value)}
                   className="bg-[#262638] border-gray-700 text-white"
                   placeholder="Escribe tu motivación..."
+                  disabled={loading}
                 />
                 <div className="flex justify-end gap-2">
                   <Button 
@@ -440,6 +481,7 @@ export default function DashboardClient({
                       setEditingMotivation(false);
                       setMotivationText(profile.daily_motivation || "");
                     }}
+                    disabled={loading}
                   >
                     Cancelar
                   </Button>
@@ -448,7 +490,9 @@ export default function DashboardClient({
                     onClick={saveMotivation}
                     disabled={loading}
                   >
-                    Guardar
+                    {loading ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : "Guardar"}
                   </Button>
                 </div>
               </div>
@@ -461,24 +505,33 @@ export default function DashboardClient({
           <div className="border-t border-gray-800 px-6 py-4">
             <h3 className="text-lg font-semibold text-white mb-4">Datos de Enfoque</h3>
             <div className="grid grid-cols-2 gap-4">
-              <div className="bg-[#262638] p-3 rounded-lg text-center">
-                <div className="flex flex-col items-center justify-center">
-                  <div className="flex items-center gap-1">
-                    <Calendar className="h-4 w-4 text-purple-400" />
-                    <span className="text-gray-400 text-sm">Últimos 7 días</span>
+              {isStatsLoading ? (
+                <>
+                  <Skeleton className="h-16 bg-[#262638]" />
+                  <Skeleton className="h-16 bg-[#262638]" />
+                </>
+              ) : (
+                <>
+                  <div className="bg-[#262638] p-3 rounded-lg text-center">
+                    <div className="flex flex-col items-center justify-center">
+                      <div className="flex items-center gap-1">
+                        <Calendar className="h-4 w-4 text-purple-400" />
+                        <span className="text-gray-400 text-sm">Últimos 7 días</span>
+                      </div>
+                      <div className="text-xl font-bold text-purple-400 mt-1">{formatMinutes(periodStats.last7Days)}</div>
+                    </div>
                   </div>
-                  <div className="text-xl font-bold text-purple-400 mt-1">{formatMinutes(periodStats.last7Days)}</div>
-                </div>
-              </div>
-              <div className="bg-[#262638] p-3 rounded-lg text-center">
-                <div className="flex flex-col items-center justify-center">
-                  <div className="flex items-center gap-1">
-                    <Calendar className="h-4 w-4 text-purple-400" />
-                    <span className="text-gray-400 text-sm">Últimos 30 días</span>
+                  <div className="bg-[#262638] p-3 rounded-lg text-center">
+                    <div className="flex flex-col items-center justify-center">
+                      <div className="flex items-center gap-1">
+                        <Calendar className="h-4 w-4 text-purple-400" />
+                        <span className="text-gray-400 text-sm">Últimos 30 días</span>
+                      </div>
+                      <div className="text-xl font-bold text-purple-400 mt-1">{formatMinutes(periodStats.last30Days)}</div>
+                    </div>
                   </div>
-                  <div className="text-xl font-bold text-purple-400 mt-1">{formatMinutes(periodStats.last30Days)}</div>
-                </div>
-              </div>
+                </>
+              )}
             </div>
           </div>
         </Card>
@@ -495,14 +548,23 @@ export default function DashboardClient({
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-2 gap-4">
-              <div className="bg-[#262638] p-4 rounded-lg">
-                <div className="text-gray-400 text-sm mb-1">Sesiones</div>
-                <div className="text-2xl font-bold text-purple-400">{todaySessions.count}</div>
-              </div>
-              <div className="bg-[#262638] p-4 rounded-lg">
-                <div className="text-gray-400 text-sm mb-1">Duración</div>
-                <div className="text-2xl font-bold text-purple-400">{formatMinutes(todaySessions.minutes)}</div>
-              </div>
+              {isStatsLoading ? (
+                <>
+                  <Skeleton className="h-16 bg-[#262638]" />
+                  <Skeleton className="h-16 bg-[#262638]" />
+                </>
+              ) : (
+                <>
+                  <div className="bg-[#262638] p-4 rounded-lg">
+                    <div className="text-gray-400 text-sm mb-1">Sesiones</div>
+                    <div className="text-2xl font-bold text-purple-400">{todaySessions.count}</div>
+                  </div>
+                  <div className="bg-[#262638] p-4 rounded-lg">
+                    <div className="text-gray-400 text-sm mb-1">Duración</div>
+                    <div className="text-2xl font-bold text-purple-400">{formatMinutes(todaySessions.minutes)}</div>
+                  </div>
+                </>
+              )}
             </div>
           </CardContent>
           
@@ -527,7 +589,7 @@ export default function DashboardClient({
                 className="h-8 w-8 p-0"
               >
                 {editingTarget ? 
-                  <Save className="h-4 w-4 text-green-400" /> : 
+                  (loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4 text-green-400" />) : 
                   <Edit2 className="h-4 w-4 text-gray-400" />
                 }
               </Button>
@@ -535,14 +597,23 @@ export default function DashboardClient({
             
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
-                <div className="bg-[#262638] p-4 rounded-lg">
-                  <div className="text-gray-400 text-sm mb-1">Sesiones Totales</div>
-                  <div className="text-2xl font-bold text-purple-400">{recentSessions.length}</div>
-                </div>
-                <div className="bg-[#262638] p-4 rounded-lg">
-                  <div className="text-gray-400 text-sm mb-1">Tiempo Total</div>
-                  <div className="text-2xl font-bold text-purple-400">{formatMinutes(profile.total_focus_time || 0)}</div>
-                </div>
+                {isStatsLoading ? (
+                  <>
+                    <Skeleton className="h-16 bg-[#262638]" />
+                    <Skeleton className="h-16 bg-[#262638]" />
+                  </>
+                ) : (
+                  <>
+                    <div className="bg-[#262638] p-4 rounded-lg">
+                      <div className="text-gray-400 text-sm mb-1">Sesiones Totales</div>
+                      <div className="text-2xl font-bold text-purple-400">{recentSessions.length}</div>
+                    </div>
+                    <div className="bg-[#262638] p-4 rounded-lg">
+                      <div className="text-gray-400 text-sm mb-1">Tiempo Total</div>
+                      <div className="text-2xl font-bold text-purple-400">{formatMinutes(profile.total_focus_time || 0)}</div>
+                    </div>
+                  </>
+                )}
               </div>
               
               {/* Target hours at the bottom */}
@@ -560,20 +631,27 @@ export default function DashboardClient({
                         value={targetHours}
                         onChange={(e) => setTargetHours(parseInt(e.target.value) || 0)}
                         className="w-16 h-6 py-1 px-2 bg-[#262638] border-gray-700 text-white"
+                        disabled={loading}
                       />
                     ) : (
                       <span className="text-sm font-medium text-white">{profile.target_hours || 100}hr</span>
                     )}
                   </div>
                 </div>
-                <Progress 
-                  value={targetHoursProgress()} 
-                  className="h-2 bg-gray-700"
-                />
-                <div className="flex justify-between text-xs text-gray-500 mt-1">
-                  <span>{targetHoursProgress()}% completado</span>
-                  <span>{formatMinutes(profile.total_focus_time || 0)} / {profile.target_hours || 100}hr</span>
-                </div>
+                {isStatsLoading ? (
+                  <Skeleton className="h-2 w-full mb-1" />
+                ) : (
+                  <>
+                    <Progress 
+                      value={targetHoursProgress()} 
+                      className="h-2 bg-gray-700"
+                    />
+                    <div className="flex justify-between text-xs text-gray-500 mt-1">
+                      <span>{targetHoursProgress()}% completado</span>
+                      <span>{formatMinutes(profile.total_focus_time || 0)} / {profile.target_hours || 100}hr</span>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
           </div>
@@ -581,12 +659,18 @@ export default function DashboardClient({
       </div>
       
       <div className="mt-6 mb-6">
-        <RecentAchievements achievements={achievements} />
+        <RecentAchievements 
+          achievements={achievements} 
+          isLoading={isAchievementsLoading} 
+        />
       </div>
 
-      {/* New Activity Heatmap (updated version) */}
+      {/* Activity Heatmap */}
       <div>
-        <ActivityHeatmap activityData={activityData} />
+        <ActivityHeatmap 
+          activityData={activityData} 
+          isLoading={isActivityLoading} 
+        />
       </div>
     </div>
   );
