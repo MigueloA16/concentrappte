@@ -400,7 +400,7 @@ export default function FocusTimer({
       }
 
       let taskId = selectedTaskId;
-      
+
       // If using a custom task name, create a new task first
       if (!selectedTaskId && customTaskName.trim()) {
         const { data: newTask, error: taskError } = await supabase
@@ -830,8 +830,8 @@ export default function FocusTimer({
 
             {/* Task selector with buttons in-line - improved alignment */}
             {!showBreakPrompt && !isActive && !isBreak && (
-              <div className="flex items-center gap-3 w-full">
-                <div className="flex-1">
+              <div className="w-full space-y-3">
+                <div className="w-full">
                   <CompactTaskSelection
                     recentTasks={recentTasks}
                     selectedTaskId={selectedTaskId}
@@ -842,39 +842,40 @@ export default function FocusTimer({
                     disabled={loading}
                   />
                 </div>
-                <Button
-                  className="bg-purple-600 hover:bg-purple-700 h-9 whitespace-nowrap"
-                  onClick={startTimer}
-                  disabled={(!selectedTaskId && !customTaskName.trim()) || loading}
-                >
-                  <Play className="h-4 w-4 mr-2" />
-                  <span className="text-sm">Comenzar</span>
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={resetTimer}
-                  className="border-gray-700 text-gray-400 hover:bg-gray-800 hover:text-white min-w-9 h-9 p-0 flex items-center justify-center"
-                >
-                  <RotateCcw className="h-4 w-4" />
-                </Button>
+                <div className="flex gap-3">
+                  <Button
+                    className="bg-purple-600 hover:bg-purple-700 flex-1"
+                    onClick={startTimer}
+                    disabled={(!selectedTaskId && !customTaskName.trim()) || loading}
+                  >
+                    <Play className="h-4 w-4 mr-2 flex-shrink-0" />
+                    <span className="text-sm">Comenzar</span>
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={resetTimer}
+                    className="border-gray-700 text-gray-400 hover:bg-gray-800 hover:text-white min-w-9 h-9 p-0 flex items-center justify-center flex-shrink-0"
+                  >
+                    <RotateCcw className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
             )}
 
-            {/* Controls for active timer state */}
             {!showBreakPrompt && isActive && (
               <div className="flex justify-center gap-3 w-full">
                 <Button
                   variant="outline"
                   onClick={pauseTimer}
-                  className="border-purple-700 text-purple-400 hover:bg-purple-900/20 px-6 h-9"
+                  className="border-purple-700 text-purple-400 hover:bg-purple-900/20 flex-1 h-9"
                 >
-                  <Pause className="h-4 w-4 mr-2" />
+                  <Pause className="h-4 w-4 mr-2 flex-shrink-0" />
                   <span className="text-sm">Pausar</span>
                 </Button>
                 <Button
                   variant="outline"
                   onClick={resetTimer}
-                  className="border-gray-700 text-gray-400 hover:bg-gray-800 hover:text-white min-w-9 h-9 p-0 flex items-center justify-center"
+                  className="border-gray-700 text-gray-400 hover:bg-gray-800 hover:text-white min-w-9 h-9 p-0 flex items-center justify-center flex-shrink-0"
                 >
                   <RotateCcw className="h-4 w-4" />
                 </Button>
@@ -884,9 +885,9 @@ export default function FocusTimer({
                   <Button
                     variant="outline"
                     onClick={finishEarly}
-                    className="border-green-700 text-green-400 hover:bg-green-900/20 px-6 h-9"
+                    className="border-green-700 text-green-400 hover:bg-green-900/20 flex-1 h-9"
                   >
-                    <StopCircle className="h-4 w-4 mr-2" />
+                    <StopCircle className="h-4 w-4 mr-2 flex-shrink-0" />
                     <span className="text-sm">Finalizar</span>
                   </Button>
                 )}

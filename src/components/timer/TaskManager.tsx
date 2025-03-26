@@ -618,13 +618,13 @@ export default function TaskManager({ tasks: initialTasks = [], onTasksChanged }
           {/* Task Counts */}
           <div className="grid grid-cols-3 gap-2">
             <div className="bg-[#262638] p-2 rounded text-center">
-              <span className="text-blue-400 text-sm">En Progreso</span>
-              <div className="text-white font-semibold">{taskCounts.in_progress}</div>
-            </div>
-            <div className="bg-[#262638] p-2 rounded text-center">
               <span className="text-yellow-400 text-sm">Pendientes</span>
               <div className="text-white font-semibold">{taskCounts.pending}</div>
             </div>
+            <div className="bg-[#262638] p-2 rounded text-center">
+              <span className="text-blue-400 text-sm">En Progreso</span>
+              <div className="text-white font-semibold">{taskCounts.in_progress}</div>
+            </div>            
             <div className="bg-[#262638] p-2 rounded text-center">
               <span className="text-green-400 text-sm">Completadas</span>
               <div className="text-white font-semibold">{taskCounts.completed}</div>

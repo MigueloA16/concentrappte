@@ -1,4 +1,3 @@
-// Compact Task Selection Component for FocusTimer
 "use client";
 
 import React, { useState, useEffect } from "react";
@@ -68,7 +67,7 @@ const CompactTaskSelection: React.FC<TaskSelectionProps> = ({
   // Handle custom task name input
   const handleTaskNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setCustomTaskName(e.target.value);
-    
+
     // If we have a task name, make sure we're not pointing to an existing task
     if (e.target.value.trim() && selectedTaskId) {
       setSelectedTaskId(null);
@@ -84,14 +83,14 @@ const CompactTaskSelection: React.FC<TaskSelectionProps> = ({
   };
 
   // Get displayed task name
-  const displayedTaskName = selectedTaskId 
+  const displayedTaskName = selectedTaskId
     ? recentTasks.find(t => t.id === selectedTaskId)?.name || "Tarea seleccionada"
-    : customTaskName.trim() 
+    : customTaskName.trim()
       ? customTaskName
       : "Selecciona una tarea";
 
   return (
-    <div className="">
+    <div className="w-full">
       {isNewTaskMode ? (
         <div className="flex space-x-2">
           <Input
@@ -103,10 +102,10 @@ const CompactTaskSelection: React.FC<TaskSelectionProps> = ({
             autoFocus
             disabled={disabled}
           />
-          <Button 
+          <Button
             size="sm"
             variant="outline"
-            className="border-gray-700"
+            className="border-gray-700 flex-shrink-0"
             onClick={() => setIsNewTaskMode(false)}
             disabled={disabled}
           >
@@ -116,18 +115,18 @@ const CompactTaskSelection: React.FC<TaskSelectionProps> = ({
       ) : (
         <DropdownMenu>
           <DropdownMenuTrigger asChild disabled={disabled}>
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               className={cn(
-                "w-full justify-between text-left font-normal border-gray-700 bg-[#262638]",
+                "w-full justify-between text-left font-normal border-gray-700 bg-[#262638] overflow-hidden",
                 !selectedTaskId && !customTaskName.trim() && "text-gray-400"
               )}
             >
-              <span className="flex items-center truncate">
-                <BookOpen className="mr-2 h-4 w-4 text-gray-400" />
+              <span className="flex items-center truncate max-w-[calc(100%-24px)]">
+                <BookOpen className="mr-2 h-4 w-4 text-gray-400 flex-shrink-0" />
                 <span className="truncate">{displayedTaskName}</span>
               </span>
-              <PlusCircle className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+              <PlusCircle className="ml-2 h-4 w-4 flex-shrink-0 opacity-50" />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent className="w-[300px] bg-[#262638] border-gray-700 text-white">
@@ -141,7 +140,7 @@ const CompactTaskSelection: React.FC<TaskSelectionProps> = ({
                 <span>Nueva tarea</span>
               </Button>
             </div>
-            
+
             {pendingTasks.length > 0 && (
               <>
                 <DropdownMenuSeparator className="bg-gray-700" />
