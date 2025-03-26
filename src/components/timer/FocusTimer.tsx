@@ -604,9 +604,6 @@ export default function FocusTimer({
   const applyTaskChange = async () => {
     try {
       setLoading(true);
-
-      debugger;
-
       // If there's no task selected, return
       if (!selectedTaskId && !customTaskName.trim()) {
         toast.error("Por favor, selecciona o ingresa una tarea");
@@ -672,7 +669,7 @@ export default function FocusTimer({
 
       // Check if this task is already in our session tasks
       const now = new Date();
-      
+
 
       if (existingTaskIndex >= 0) {
         // If the task already exists and has an end time (was used earlier in the session)
@@ -725,6 +722,7 @@ export default function FocusTimer({
 
   // Prepare task completion dialog
   const prepareTaskCompletionDialog = () => {
+
     // Find all unique task IDs in the session
     const uniqueTaskIds = [...new Set(sessionTasks.map(task => task.taskId))];
 
@@ -801,8 +799,8 @@ export default function FocusTimer({
       // Fix: Ensure we properly handle dates in sessionTasks
       const now = new Date();
       const updatedTasks = sessionTasks.map(task => {
-      // Check if task is selected for completion
-      const shouldComplete = taskCompletionStates[task.taskId] || false;
+        // Check if task is selected for completion
+        const shouldComplete = taskCompletionStates[task.taskId] || false;
 
         // If the task should be completed and doesn't have an end time, add it
         let taskEndTime = task.endTime;
@@ -850,6 +848,9 @@ export default function FocusTimer({
 
   // Handle task complete dialog response
   const handleTaskComplete = async (proceed: boolean) => {
+    // Check if this dialog was opened after completing a session
+    const wasSessionCompleted = sessionCompleted;
+
     if (!proceed) {
       // User canceled, close the dialog
       setShowTaskCompleteDialog(false);
@@ -864,55 +865,55 @@ export default function FocusTimer({
         setSessionCount(0);
         toast.success("¡Felicitaciones! Has completado todas tus sesiones de enfoque.");
       }
+
+      // If the session was completed (via finishEarly or timer completion),
+      // now is the time to call onSessionComplete
+      if (wasSessionCompleted && onSessionComplete) {
+        onSessionComplete();
+      }
+
+      // Reset the session completed flag
+      setSessionCompleted(false);
+
       return;
     }
 
     // User confirmed, process the task completions
     await processTaskCompletions();
+
+    // If the session was completed, now is the time to call onSessionComplete
+    if (wasSessionCompleted && onSessionComplete) {
+      onSessionComplete();
+    }
+
+    // Reset the session completed flag
+    setSessionCompleted(false);
   };
 
   // Function to finish session early
   const finishEarly = async () => {
     if (!currentSessionId || isBreak) return;
-  
+
     try {
       setLoading(true);
-  
+
       // Calculate the time spent so far
       const startTimeObj = sessionStartTime ? new Date(sessionStartTime) : null;
       if (!startTimeObj) {
         throw new Error("No start time recorded");
       }
-  
+
       const now = new Date();
       // Calculate minutes elapsed for the entire session
       const minutesElapsed = Math.floor((now.getTime() - startTimeObj.getTime()) / 60000);
-  
+
       // Only record if at least 1 minute has elapsed
       if (minutesElapsed < 1) {
         toast.error("La sesión debe durar al menos 1 minuto para ser registrada");
         return;
       }
-  
-      // Finalize the current task if there is one
-      if (currentTask && selectedTaskId) {
-        // Find the current task in the session tasks array
-        const updatedTasks = [...sessionTasks];
-        const currentTaskIndex = updatedTasks.findIndex(t => t.taskId === selectedTaskId && !t.endTime);
-        
-        if (currentTaskIndex >= 0) {
-          // Update the end time for the current task
-          updatedTasks[currentTaskIndex] = {
-            ...updatedTasks[currentTaskIndex],
-            endTime: now,
-            durationMinutes: Math.floor((now.getTime() - new Date(updatedTasks[currentTaskIndex].startTime).getTime()) / 60000)
-          };
-          
-          setSessionTasks(updatedTasks);
-        }
-      }
-  
-      // Update the session in Supabase
+
+      // Update the session in Supabase - mark end time but don't finalize tasks yet
       const { error } = await supabase
         .from("focus_sessions")
         .update({
@@ -925,7 +926,7 @@ export default function FocusTimer({
               name: task.name,
               startTime: new Date(task.startTime).toISOString(),
               endTime: task.endTime ? new Date(task.endTime).toISOString() : now.toISOString(),
-              durationMinutes: task.durationMinutes || (task.endTime 
+              durationMinutes: task.durationMinutes || (task.endTime
                 ? Math.floor((new Date(task.endTime).getTime() - new Date(task.startTime).getTime()) / 60000)
                 : Math.floor((now.getTime() - new Date(task.startTime).getTime()) / 60000)),
               completed: task.completed
@@ -933,30 +934,30 @@ export default function FocusTimer({
           })
         })
         .eq("id", currentSessionId);
-  
+
       if (error) throw error;
-  
-      // Rest of function remains the same...
-      
+
       // Reset timer state
       setIsActive(false);
       setMinutes(defaultFocusTime);
       setSeconds(0);
       cleanupTimerState();
-      
+
       // Increment session count when finished early
       setSessionCount(prevCount => prevCount + 1);
-  
-      // Prepare the task completion dialog with all session tasks
+
+      // Set sessionCompleted flag to true to indicate this was a session completion
+      // This flag will be used in handleTaskComplete to determine when to call onSessionComplete
+      setSessionCompleted(true);
+
+      // IMPORTANT: Don't call onSessionComplete here!
+      // We'll handle it in handleTaskComplete after the user interacts with the dialog
+
+      // Prepare and show the task completion dialog
       prepareTaskCompletionDialog();
-  
-      // Call callback if provided
-      if (onSessionComplete) {
-        onSessionComplete();
-      }
-  
+
       toast.success(`¡Sesión completada! Has registrado ${minutesElapsed} minutos de enfoque.`);
-  
+
     } catch (error) {
       console.error("Error al finalizar la sesión:", error);
       toast.error(error instanceof Error ? error.message : "Error al finalizar la sesión");
@@ -1063,10 +1064,10 @@ export default function FocusTimer({
       setStartTime(null);
       setSessionStartTime(null);
 
-      // Call callback if provided
-      if (onSessionComplete) {
-        onSessionComplete();
-      }
+      // Set the sessionCompleted flag to true
+      // Important: We DON'T call onSessionComplete here anymore
+      // It will be called after the user interacts with the task completion dialog
+      setSessionCompleted(true);
     } catch (error) {
       console.error("Error al completar la sesión:", error);
       toast.error(error instanceof Error ? error.message : "Error al completar la sesión");
@@ -1383,7 +1384,7 @@ export default function FocusTimer({
           </DialogHeader>
 
           {taskDialogStep === 'selection' && (
-            <div className="mt-4 space-y-2 max-h-60 overflow-y-auto">
+            <div className="mt-1 space-y-2 max-h-60 overflow-y-auto">
               {/* Group tasks by ID to show unique tasks with their total time */}
               {Object.entries(
                 sessionTasks.reduce((acc: { [key: string]: { id: string, name: string, totalMinutes: number, completed: boolean } }, task) => {
@@ -1397,8 +1398,9 @@ export default function FocusTimer({
                   }
 
                   // Calculate minutes for this task instance
-                  const endTime = task?.endTime || new Date();
-                  const minutes = Math.floor((endTime.getTime() - task.startTime.getTime()) / 60000);
+                  const startTimeDate = new Date(task.startTime);
+                  const endTimeDate = task.endTime ? new Date(task.endTime) : new Date();
+                  const minutes = Math.floor((endTimeDate.getTime() - startTimeDate.getTime()) / 60000);
 
                   // Add to total
                   acc[task.taskId].totalMinutes += minutes;
