@@ -11,7 +11,7 @@ import { Clock, Info, Loader2 } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
-import { TimerSettings as TimerSettingsType } from "@/lib/supabase/database.types";
+import { TimerSetting as TimerSettingsType } from "@/lib/supabase/database.types";
 import { Skeleton } from "@/components/ui/skeleton";
 
 // Define time management techniques with their default values

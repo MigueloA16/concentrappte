@@ -392,7 +392,7 @@ export type FocusSession = Database['public']['Tables']['focus_sessions']['Row']
 };
 
 // TimerSettings type
-export type TimerSettings = Database['public']['Tables']['timer_settings']['Row'] & {
+export type TimerSetting = Database['public']['Tables']['timer_settings']['Row'] & {
   technique?: Pick<TimeManagementTechnique, 'name' | 'description'>;
 };
 
