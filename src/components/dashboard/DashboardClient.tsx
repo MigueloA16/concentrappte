@@ -1,4 +1,4 @@
-// src/components/dashboard/DashboardClient.tsx
+// src/components/dashboard/DashboardClient.tsx with updated heatmap
 "use client";
 
 import { useState, useEffect, useRef } from "react";
@@ -12,6 +12,7 @@ import { format, subDays, isToday, parseISO, startOfYear, eachDayOfInterval } fr
 import { es } from "date-fns/locale";
 import RecentAchievements from "@/components/achievements/RecentAchievements";
 import { AchievementWithProgress } from "@/lib/supabase/database.types";
+import { ActivityHeatmap } from "@/components/dashboard/ActivityHeatmap"; // Import the new component
 import { 
   Trophy, 
   Edit2, 
@@ -23,8 +24,6 @@ import {
   Flame,
   Award
 } from "lucide-react";
-
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 // Define level thresholds in minutes
 const LEVELS = [
@@ -322,15 +321,6 @@ export default function DashboardClient({
     }
   };
 
-  // Calculate intensity for activity heatmap
-  const getActivityIntensity = (minutes) => {
-    if (minutes === 0) return 0;
-    if (minutes < 15) return 1;
-    if (minutes < 30) return 2;
-    if (minutes < 60) return 3;
-    return 4;
-  };
-
   // Format minutes to hours and minutes
   const formatMinutes = (minutes) => {
     const hours = Math.floor(minutes / 60);
@@ -591,72 +581,13 @@ export default function DashboardClient({
         </Card>
       </div>
       
-      <div className="mt-6 mb-20 md:mb-6"> {/* Added more bottom margin on mobile */}
+      <div className="mt-6 mb-6">
         <RecentAchievements achievements={achievements} />
       </div>
 
-      {/* Activity History - Only visible on desktop */}
-      <div className="hidden md:block">
-        <Card className="bg-[#1a1a2e] border-gray-800 mt-8">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-white">Historial de Actividad</CardTitle>
-            <CardDescription className="text-gray-400">Tu tiempo de enfoque durante el año</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="overflow-x-auto">
-              <TooltipProvider>
-                <div>
-                  <div className="space-y-2">
-                    <div className="grid grid-cols-52 gap-[1px]">
-                      {activityData.map((day, index) => {
-                        const intensity = getActivityIntensity(day.total_minutes);
-                        let bgColor = 'bg-[#101018]';
-                        
-                        if (intensity === 1) bgColor = 'bg-green-900/30';
-                        if (intensity === 2) bgColor = 'bg-green-800/50';
-                        if (intensity === 3) bgColor = 'bg-green-700/70';
-                        if (intensity === 4) bgColor = 'bg-green-600';
-                        
-                        return (
-                          <Tooltip key={index}>
-                            <TooltipTrigger asChild>
-                              <div
-                                className={`${bgColor} w-2.5 h-2.5 rounded-sm cursor-pointer`}
-                              />
-                            </TooltipTrigger>
-                            <TooltipContent className="bg-[#262638] border-gray-700 text-white">
-                              <div className="text-xs">
-                                <div className="font-medium">{format(parseISO(day.date), 'PP', { locale: es })}</div>
-                                {day.total_minutes > 0 ? (
-                                  <>
-                                    <div className="text-gray-300">{formatMinutes(day.total_minutes)} de enfoque</div>
-                                    <div className="text-gray-300">{day.sessions_count} sesiones</div>
-                                  </>
-                                ) : (
-                                  <div className="text-gray-300">No hay actividad</div>
-                                )}
-                              </div>
-                            </TooltipContent>
-                          </Tooltip>
-                        );
-                      })}
-                    </div>
-                    
-                    <div className="flex justify-end items-center mt-2 space-x-1 text-xs text-gray-500">
-                      <span>Menos</span>
-                      <div className="bg-[#101018] w-2 h-2 rounded-sm"></div>
-                      <div className="bg-green-900/30 w-2 h-2 rounded-sm"></div>
-                      <div className="bg-green-800/50 w-2 h-2 rounded-sm"></div>
-                      <div className="bg-green-700/70 w-2 h-2 rounded-sm"></div>
-                      <div className="bg-green-600 w-2 h-2 rounded-sm"></div>
-                      <span>Más</span>
-                    </div>
-                  </div>
-                </div>
-              </TooltipProvider>
-            </div>
-          </CardContent>
-        </Card>
+      {/* New Activity Heatmap (updated version) */}
+      <div>
+        <ActivityHeatmap activityData={activityData} />
       </div>
     </div>
   );

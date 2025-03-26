@@ -48,7 +48,7 @@ export default function AuthForm({ view }: AuthFormProps) {
   }, [router]);
 
   const getURL = () => {
-    let url = window.location.origin; // This is more reliable than env vars
+    const url = window.location.origin; // This is more reliable than env vars
     
     // Don't add trailing slash as we'll add specific paths
     return url;
