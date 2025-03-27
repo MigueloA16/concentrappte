@@ -4,71 +4,56 @@ import { createClient } from "@/lib/supabase/server";
 import { getUserProfile } from "@/app/auth-check";
 import DashboardClient from "@/components/dashboard/DashboardClient";
 
+// Import types directly from database.types
+import { 
+  ProfileWithLevel, 
+  FocusSession, 
+  AchievementWithProgress, 
+  DailyActivity 
+} from "@/lib/supabase/database.types";
+
 export const dynamic = 'force-dynamic';
+export const revalidate = 0; // Disable caching for real-time data
 
-export default async function DashboardPage() {
-  const profile = await getUserProfile();
+async function fetchTodaySessions(userId: string): Promise<FocusSession[]> {
   const supabase = await createClient();
-
-  // Get today's sessions - order by end_time
   const today = new Date();
-  const todayISOString = today.toISOString().split('T')[0]; // YYYY-MM-DD format
+  const todayISOString = today.toISOString().split('T')[0];
 
-  const { data: todaySessions } = await supabase
+  const { data: todaySessions, error } = await supabase
     .from("focus_sessions")
     .select(`
       *,
-      task:task_id (id, name)
+      task:task_id (name)
     `)
-    .eq("user_id", profile?.id || '')
-    .gte("end_time", todayISOString) // Filter for sessions from today
-    .lt("end_time", new Date(today.getTime() + 86400000).toISOString().split('T')[0]) // Before tomorrow
+    .eq("user_id", userId)
+    .gte("end_time", todayISOString)
+    .lt("end_time", new Date(today.getTime() + 86400000).toISOString().split('T')[0])
     .order("end_time", { ascending: false });
 
-  // Get total sessions count and total time 
-  const { data: totalStats } = await supabase
-    .rpc('get_user_session_stats');
+  if (error) {
+    console.error("Error fetching today's sessions:", error);
+    return [];
+  }
 
-  // Get session stats for the last 7 and 30 days
-  const lastWeekDate = new Date(today);
-  lastWeekDate.setDate(today.getDate() - 7);
+  return todaySessions as FocusSession[];
+}
 
-  const lastMonthDate = new Date(today);
-  lastMonthDate.setDate(today.getDate() - 30);
+async function fetchAchievements(userId: string): Promise<AchievementWithProgress[]> {
+  const supabase = await createClient();
 
-  const { data: periodSessions } = await supabase
-    .from("focus_sessions")
-    .select(`duration_minutes, end_time`)
-    .eq("user_id", profile?.id || '')
-    .gte("end_time", lastMonthDate.toISOString());
-
-  // Calculate stats for the periods
-  const last7Days = periodSessions?.filter(session =>
-    new Date(session.end_time || '') >= lastWeekDate
-  ).reduce((sum, session) => sum + (session.duration_minutes || 0), 0) || 0;
-
-  const last30Days = periodSessions?.reduce((sum, session) =>
-    sum + (session.duration_minutes || 0), 0) || 0;
-
-  // Get daily activity data for heatmap
-  const startDate = new Date(today);
-  startDate.setFullYear(today.getFullYear(), 0, 1); // Start of year
-
-  const { data: activityData } = await supabase
-    .from("daily_activity")
-    .select("*")
-    .eq("user_id", profile?.id || '')
-    .gte("date", startDate.toISOString().split('T')[0])
-    .lte("date", today.toISOString().split('T')[0])
-    .order("date", { ascending: true });
-
-  // Get ALL achievements
-  const { data: allAchievements } = await supabase
+  // Fetch all achievements
+  const { data: allAchievements, error: achievementsError } = await supabase
     .from("achievements")
     .select("*");
 
-  // Get user achievements with their details
-  const { data: userAchievements } = await supabase
+  if (achievementsError) {
+    console.error("Error fetching achievements:", achievementsError);
+    return [];
+  }
+
+  // Fetch user's achievement progress
+  const { data: userAchievements, error: userAchievementsError } = await supabase
     .from("user_achievements")
     .select(`
       *,
@@ -82,9 +67,14 @@ export default async function DashboardPage() {
         requirement_value
       )
     `)
-    .eq("user_id", profile?.id || '');
+    .eq("user_id", userId);
 
-  // Create a map of user's achievements by achievement_id
+  if (userAchievementsError) {
+    console.error("Error fetching user achievements:", userAchievementsError);
+    return [];
+  }
+
+  // Create a map of user's achievements
   const userAchievementsMap = new Map();
   userAchievements?.forEach(ua => {
     userAchievementsMap.set(ua.achievement_id, {
@@ -94,30 +84,112 @@ export default async function DashboardPage() {
     });
   });
 
-  // Format achievements for the client component, including ALL achievements
+  // Combine achievements with user progress
   const achievementsWithProgress = allAchievements?.map(achievement => {
     const userProgress = userAchievementsMap.get(achievement.id);
-
+    
     return {
       ...achievement,
       progress: userProgress?.progress || 0,
       unlocked: userProgress?.unlocked || false,
       unlocked_at: userProgress?.unlocked_at || null
-    };
+    } as AchievementWithProgress;
   }) || [];
+
+  return achievementsWithProgress;
+}
+
+async function fetchActivityData(userId: string): Promise<DailyActivity[]> {
+  const supabase = await createClient();
+  const startDate = new Date();
+  startDate.setFullYear(startDate.getFullYear(), 0, 1);
+
+  const { data: activityData, error } = await supabase
+    .from("daily_activity")
+    .select("*")
+    .eq("user_id", userId)
+    .gte("date", startDate.toISOString().split('T')[0])
+    .lte("date", new Date().toISOString().split('T')[0])
+    .order("date", { ascending: true });
+
+  if (error) {
+    console.error("Error fetching activity data:", error);
+    return [];
+  }
+
+  return activityData as DailyActivity[];
+}
+
+async function fetchSessionStats(userId: string) {
+  const supabase = await createClient();
+  const today = new Date();
+  
+  const { data: totalStats } = await supabase.rpc('get_user_session_stats');
+
+  const lastWeekDate = new Date(today);
+  lastWeekDate.setDate(today.getDate() - 7);
+
+  const lastMonthDate = new Date(today);
+  lastMonthDate.setDate(today.getDate() - 30);
+
+  const { data: periodSessions, error } = await supabase
+    .from("focus_sessions")
+    .select(`duration_minutes, end_time`)
+    .eq("user_id", userId)
+    .gte("end_time", lastMonthDate.toISOString());
+
+  if (error) {
+    console.error("Error fetching period sessions:", error);
+    return { 
+      totalStats: { count: 0, total_minutes: 0 }, 
+      periodStats: { last7Days: 0, last30Days: 0 } 
+    };
+  }
+
+  const last7Days = periodSessions?.filter(session =>
+    new Date(session.end_time || '') >= lastWeekDate
+  ).reduce((sum, session) => sum + (session.duration_minutes || 0), 0) || 0;
+
+  const last30Days = periodSessions?.reduce((sum, session) =>
+    sum + (session.duration_minutes || 0), 0) || 0;
+
+  return { 
+    totalStats: totalStats[0] || { count: 0, total_minutes: 0 }, 
+    periodStats: { last7Days, last30Days } 
+  };
+}
+
+export default async function DashboardPage() {
+  // Get user profile and check authentication
+  const profile = await getUserProfile();
+  
+  if (!profile) {
+    // Redirect or handle unauthenticated user
+    return <div>Unauthorized</div>;
+  }
+
+  // Fetch data in parallel for better performance
+  const [
+    todaySessions, 
+    achievements, 
+    activityData, 
+    { totalStats, periodStats }
+  ] = await Promise.all([
+    fetchTodaySessions(profile.id),
+    fetchAchievements(profile.id),
+    fetchActivityData(profile.id),
+    fetchSessionStats(profile.id)
+  ]);
 
   return (
     <Suspense fallback={<div>Cargando...</div>}>
       <DashboardClient
-        initialProfile={profile}
-        initialTodaySessions={todaySessions || []}
-        initialAchievements={achievementsWithProgress}
-        initialActivityData={activityData || []}
-        periodStats={{
-          last7Days,
-          last30Days
-        }}
-        totalStats={totalStats[0] || { count: 0, total_minutes: 0 }}
+        initialProfile={profile as ProfileWithLevel}
+        initialTodaySessions={todaySessions}
+        initialAchievements={achievements}
+        initialActivityData={activityData}
+        periodStats={periodStats}
+        totalStats={totalStats}
       />
     </Suspense>
   );

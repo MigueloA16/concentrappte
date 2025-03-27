@@ -1,50 +1,68 @@
 // src/components/achievements/RecentAchievements.tsx
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Trophy, ChevronRight } from "lucide-react";
-import Link from "next/link";
-import { iconMap } from "@/lib/achievement-icons";
-import { AchievementWithProgress } from "@/lib/supabase/database.types";
-import { Skeleton } from "@/components/ui/skeleton";
+import React, { useMemo } from 'react';
+import Link from 'next/link';
+import { Trophy, ChevronRight } from 'lucide-react';
 
+// UI Components
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
+
+// Icons and Utilities
+import { iconMap } from '@/lib/achievement-icons';
+
+// Types
+import { AchievementWithProgress } from '@/lib/supabase/database.types';
+
+// Component Interface
 interface RecentAchievementsProps {
   achievements: AchievementWithProgress[];
   isLoading?: boolean;
 }
 
-export default function RecentAchievements({ achievements, isLoading = false }: RecentAchievementsProps) {
-  // Get the total count of available achievements
-  const totalAchievements = achievements.length;
+export default function RecentAchievements({
+  achievements,
+  isLoading = false
+}: RecentAchievementsProps) {
+  // Memoized Calculations
+  const achievementStats = useMemo(() => {
+    // Total count of available achievements
+    const totalAchievements = achievements.length;
 
-  // Count how many achievements have been unlocked
-  const unlockedCount = achievements.filter(a => a.unlocked).length;
+    // Count of unlocked achievements
+    const unlockedCount = achievements.filter(a => a.unlocked).length;
 
-  // Find the next achievements to unlock (those not unlocked but with progress > 0)
-  const inProgressAchievements = achievements
-    .filter(a => !a.unlocked && a.progress > 0)
-    .sort((a, b) => {
-      // Sort by percentage completion (higher first)
-      const aPercentage = (a.progress / a.requirement_value) * 100;
-      const bPercentage = (b.progress / b.requirement_value) * 100;
-      return bPercentage - aPercentage;
-    })
-    .slice(0, 3);
+    // Find the next achievements to unlock (not unlocked but with progress)
+    const inProgressAchievements = achievements
+      .filter(a => !a.unlocked && a.progress > 0)
+      .sort((a, b) => {
+        const aPercentage = (a.progress / a.requirement_value) * 100;
+        const bPercentage = (b.progress / b.requirement_value) * 100;
+        return bPercentage - aPercentage;
+      })
+      .slice(0, 3);
 
-  // Get the most recently unlocked achievements (max 3)
-  const recentUnlocked = achievements
-    .filter(a => a.unlocked && a.unlocked_at)
-    .sort((a, b) => {
-      const dateA = a.unlocked_at ? new Date(a.unlocked_at).getTime() : 0;
-      const dateB = b.unlocked_at ? new Date(b.unlocked_at).getTime() : 0;
-      return dateB - dateA;
-    })
-    .slice(0, 3);
+    // Most recently unlocked achievements
+    const recentUnlocked = achievements
+      .filter(a => a.unlocked && a.unlocked_at)
+      .sort((a, b) => {
+        const dateA = a.unlocked_at ? new Date(a.unlocked_at).getTime() : 0;
+        const dateB = b.unlocked_at ? new Date(b.unlocked_at).getTime() : 0;
+        return dateB - dateA;
+      })
+      .slice(0, 3);
 
-  // Determine what to display based on unlocked and in-progress achievements
-  const hasUnlocked = recentUnlocked.length > 0;
-  const hasInProgress = inProgressAchievements.length > 0;
+    return {
+      totalAchievements,
+      unlockedCount,
+      inProgressAchievements,
+      recentUnlocked,
+      hasUnlocked: recentUnlocked.length > 0,
+      hasInProgress: inProgressAchievements.length > 0
+    };
+  }, [achievements]);
 
-  // Render loading skeleton
+  // Render Loading State
   if (isLoading) {
     return (
       <Card className="bg-[#1a1a2e] border-gray-800 flex-1 flex flex-col">
@@ -52,7 +70,6 @@ export default function RecentAchievements({ achievements, isLoading = false }: 
           <div className="flex justify-between items-center">
             <div>
               <CardTitle className="text-white">Logros</CardTitle>
-              {/* Fixed: Don't put Skeleton inside CardDescription */}
               <div className="text-gray-400 mt-2">
                 <Skeleton className="h-4 w-48" />
               </div>
@@ -76,14 +93,14 @@ export default function RecentAchievements({ achievements, isLoading = false }: 
     );
   }
 
-  if (!hasUnlocked && !hasInProgress) {
-    // No unlocked or in-progress achievements
+  // Render Empty State
+  if (!achievementStats.hasUnlocked && !achievementStats.hasInProgress) {
     return (
       <Card className="bg-[#1a1a2e] border-gray-800">
         <CardHeader className="pb-2">
           <CardTitle className="text-white">Logros</CardTitle>
           <CardDescription className="text-gray-400 mt-2">
-            Has desbloqueado {unlockedCount} de {totalAchievements} logros
+            Has desbloqueado {achievementStats.unlockedCount} de {achievementStats.totalAchievements} logros
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col items-center justify-center py-6 text-center">
@@ -101,6 +118,7 @@ export default function RecentAchievements({ achievements, isLoading = false }: 
     );
   }
 
+  // Render Achievements View
   return (
     <Card className="bg-[#1a1a2e] border-gray-800">
       <CardHeader className="pb-2">
@@ -108,7 +126,7 @@ export default function RecentAchievements({ achievements, isLoading = false }: 
           <div>
             <CardTitle className="text-white">Logros</CardTitle>
             <CardDescription className="text-gray-400 mt-2">
-              Has desbloqueado {unlockedCount} de {totalAchievements} logros
+              Has desbloqueado {achievementStats.unlockedCount} de {achievementStats.totalAchievements} logros
             </CardDescription>
           </div>
           <Link href="/achievements">
@@ -122,11 +140,11 @@ export default function RecentAchievements({ achievements, isLoading = false }: 
       <CardContent>
         <div className="space-y-5">
           {/* Recently unlocked achievements section */}
-          {hasUnlocked && (
+          {achievementStats.hasUnlocked && (
             <div>
               <h3 className="text-sm font-medium text-gray-300 mb-2">Recién desbloqueados</h3>
               <div className="space-y-3">
-                {recentUnlocked.map((achievement) => {
+                {achievementStats.recentUnlocked.map((achievement) => {
                   const IconComponent = iconMap[achievement.icon_name as keyof typeof iconMap] || iconMap.Trophy;
 
                   return (
@@ -146,11 +164,11 @@ export default function RecentAchievements({ achievements, isLoading = false }: 
           )}
 
           {/* In-progress achievements section */}
-          {hasInProgress && (
+          {achievementStats.hasInProgress && (
             <div>
               <h3 className="text-sm font-medium text-gray-300 mb-2">Próximos logros</h3>
               <div className="space-y-3">
-                {inProgressAchievements.map((achievement) => {
+                {achievementStats.inProgressAchievements.map((achievement) => {
                   const IconComponent = iconMap[achievement.icon_name as keyof typeof iconMap] || iconMap.Trophy;
                   const progressPercentage = Math.round((achievement.progress / achievement.requirement_value) * 100);
 
