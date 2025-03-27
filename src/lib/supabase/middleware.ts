@@ -38,15 +38,22 @@ export async function updateSession(request: NextRequest) {
 
   // Allow access to auth pages (sign-in, sign-up, verify, etc.)
   // Add callback route to the allowed paths
-  const authPaths = ['/auth/sign-in', '/auth/sign-up', '/auth/verify', '/auth/callback']
+  const authPaths = [
+    '/auth/sign-in',
+    '/auth/sign-up',
+    '/auth/verify',
+    '/auth/callback',
+    '/auth/forgot-password',
+    '/auth/reset-password'
+  ]
   const isAuthPath = authPaths.some(path => request.nextUrl.pathname.startsWith(path))
-  
+
   // Also allow access to the home page
   const isHomePage = request.nextUrl.pathname === '/'
-  
+
   // Allow access to API routes
   const isApiRoute = request.nextUrl.pathname.startsWith('/api/')
-  
+
   if (!user && !isAuthPath && !isHomePage && !isApiRoute) {
     // No user, redirect to the sign-in page with a return URL
     const returnUrl = encodeURIComponent(request.nextUrl.pathname)
@@ -54,9 +61,13 @@ export async function updateSession(request: NextRequest) {
     url.searchParams.set('returnUrl', returnUrl)
     return NextResponse.redirect(url)
   }
-  
+
   // If user is authenticated and tries to access auth pages, redirect to hub
-  if (user && isAuthPath && !request.nextUrl.pathname.startsWith('/auth/callback')) {
+  // Exception: allow reset-password and callback routes even if authenticated
+  const allowedAuthPaths = ['/auth/callback', '/auth/reset-password']
+  const isAllowedAuthPath = allowedAuthPaths.some(path => request.nextUrl.pathname.startsWith(path))
+
+  if (user && isAuthPath && !isAllowedAuthPath) {
     return NextResponse.redirect(new URL('/hub', request.url))
   }
 

@@ -30,12 +30,12 @@ export default function AuthForm({ view }: AuthFormProps) {
       const params = new URLSearchParams(window.location.search);
       const error = params.get('error');
       const errorDescription = params.get('error_description');
-      
+
       if (error) {
         toast.error(errorDescription || `Error de autenticación: ${error}`);
         setAuthError(errorDescription || `Error de autenticación: ${error}`);
       }
-      
+
       // Check if we have a session already
       const { data } = await supabase.auth.getSession();
       if (data.session) {
@@ -43,17 +43,17 @@ export default function AuthForm({ view }: AuthFormProps) {
         router.push('/hub');
       }
     };
-    
+
     checkForErrors();
   }, [router]);
 
   const getURL = () => {
     const url = window.location.origin; // This is more reliable than env vars
-    
+
     // Don't add trailing slash as we'll add specific paths
     return url;
   };
-  
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -89,10 +89,10 @@ export default function AuthForm({ view }: AuthFormProps) {
         }
 
         toast.success("Ingresaste exitosamente!");
-        
+
         // Force a refresh to ensure profile is created
         await fetch('/api/auth/refresh-session', { method: 'POST' });
-        
+
         router.push("/hub");
         router.refresh();
       }
@@ -105,17 +105,19 @@ export default function AuthForm({ view }: AuthFormProps) {
       setLoading(false);
     }
   };
-  
+
   const handleOAuthSignIn = async (provider: 'github' | 'google') => {
     try {
       setOauthLoading(provider);
       setAuthError(null);
-      
+
       // Set up the OAuth sign-in
       const { error } = await supabase.auth.signInWithOAuth({
         provider,
         options: {
           redirectTo: `${getURL()}/auth/callback`,
+          // This helps ensure we capture all available profile information
+          scopes: provider === 'google' ? 'profile email' : undefined,
           queryParams: provider === 'google' ? {
             access_type: 'offline',
             prompt: 'consent',
@@ -126,7 +128,7 @@ export default function AuthForm({ view }: AuthFormProps) {
       if (error) {
         throw error;
       }
-      
+
       // If we get here, the OAuth redirect is happening
       // No need to do anything as the browser will be redirected
     } catch (error: any) {
@@ -165,7 +167,7 @@ export default function AuthForm({ view }: AuthFormProps) {
                 {authError}
               </div>
             )}
-          
+
             {/* Social login buttons */}
             <div className="space-y-2">
               <Button
@@ -180,8 +182,8 @@ export default function AuthForm({ view }: AuthFormProps) {
                   <Github className="mr-2 h-4 w-4" />
                 )}
                 {view === "sign-in"
-                ? "Ingresa"
-                : "Regístrate"} con GitHub
+                  ? "Ingresa"
+                  : "Regístrate"} con GitHub
               </Button>
               <Button
                 variant="outline"
@@ -201,8 +203,8 @@ export default function AuthForm({ view }: AuthFormProps) {
                   </svg>
                 )}
                 {view === "sign-in"
-                ? "Ingresa"
-                : "Regístrate"} con Google
+                  ? "Ingresa"
+                  : "Regístrate"} con Google
               </Button>
             </div>
 
