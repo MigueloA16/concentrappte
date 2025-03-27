@@ -47,7 +47,7 @@ export default function RecentAchievements({ achievements, isLoading = false }: 
   // Render loading skeleton
   if (isLoading) {
     return (
-      <Card className="bg-[#1a1a2e] border-gray-800">
+      <Card className="bg-[#1a1a2e] border-gray-800 flex-1 flex flex-col">
         <CardHeader className="pb-2">
           <div className="flex justify-between items-center">
             <div>

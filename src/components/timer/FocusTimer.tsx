@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input"; // <-- Import Input
 import {
   Play,
   Pause,
@@ -53,6 +54,10 @@ export default function FocusTimer({
 
   // Session time tracking
   const [sessionStartTime, setSessionStartTime] = useState<Date | null>(null);
+
+  // --- New State for Session Name Input ---
+  const [sessionNameInput, setSessionNameInput] = useState("");
+  // -----------------------------------------
 
   // Audio ref for notifications
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -255,16 +260,29 @@ export default function FocusTimer({
 
       // Create a new focus session in Supabase - no task relationship
       const now = new Date();
-      const sessionData = {
+      // --- Prepare session data, including optional name ---
+      const sessionData: {
+        user_id: string;
+        start_time: string;
+        is_completed: boolean;
+        technique_id: string | undefined;
+        session_name?: string; // Make session_name optional
+      } = {
         user_id: user.id,
         start_time: now.toISOString(),
         is_completed: false,
-        technique_id: currentTechniqueId
+        technique_id: currentTechniqueId,
       };
+
+      const trimmedName = sessionNameInput.trim();
+      if (trimmedName) {
+        sessionData.session_name = trimmedName;
+      }
+      // ----------------------------------------------------
 
       const { data, error } = await supabase
         .from("focus_sessions")
-        .insert(sessionData)
+        .insert(sessionData) // <-- Send the potentially modified sessionData
         .select()
         .single();
 
@@ -275,6 +293,7 @@ export default function FocusTimer({
       setSessionStartTime(now); // Set overall session start time
       setIsActive(true);
       setShowBreakPrompt(false);
+      setSessionNameInput(""); // <-- Reset input field after successful start
 
       toast.success("¡Sesión de enfoque iniciada!");
     } catch (error) {
@@ -298,6 +317,8 @@ export default function FocusTimer({
     setStartTime(null);
     setSessionStartTime(null);
     setShowBreakPrompt(false);
+    // Also clear potential session name input if resetting entirely
+    setSessionNameInput("");
   };
 
   // Start the break session
@@ -329,6 +350,8 @@ export default function FocusTimer({
     // Ensure current session is cleared properly
     setCurrentSessionId(null);
     setStartTime(null);
+    // Clear potential session name input when skipping break
+    setSessionNameInput("");
   };
   // Function to finish session early
   const finishEarly = async () => {
@@ -350,6 +373,7 @@ export default function FocusTimer({
       // Only record if at least 1 minute has elapsed
       if (minutesElapsed < 1) {
         toast.error("La sesión debe durar al menos 1 minuto para ser registrada");
+        setLoading(false); // <-- Make sure to stop loading on early return
         return;
       }
 
@@ -374,12 +398,12 @@ export default function FocusTimer({
       setIsActive(false);
       setMinutes(defaultFocusTime);
       setSeconds(0);
-      cleanupTimerState();
+      cleanupTimerState(); // cleanup includes resetting session name input
 
       // Increment session count when finished early
       setSessionCount(prevCount => prevCount + 1);
 
-      // Set sessionCompleted flag to true 
+      // Set sessionCompleted flag to true
       setSessionCompleted(true);
 
       // Call onSessionComplete
@@ -392,7 +416,7 @@ export default function FocusTimer({
       // If we've completed all sessions, reset the counter
       if (sessionCount + 1 >= defaultTargetSessions) {
         toast.success("¡Felicitaciones! Has completado todas tus sesiones de enfoque.");
-        setSessionCount(0);
+        setSessionCount(0); // Reset count here
       }
 
     } catch (error) {
@@ -408,7 +432,7 @@ export default function FocusTimer({
     setIsActive(false);
     setMinutes(isBreak ? defaultBreakLength : defaultFocusTime);
     setSeconds(0);
-    cleanupTimerState();
+    cleanupTimerState(); // cleanup includes resetting session name input
     toast.info("Temporizador reiniciado");
   };
 
@@ -445,6 +469,8 @@ export default function FocusTimer({
       setCurrentSessionId(null);
       setStartTime(null);
       setSessionStartTime(null);
+      // Clear potential session name input after session is fully complete
+      setSessionNameInput("");
 
       // Set the sessionCompleted flag to true
       setSessionCompleted(true);
@@ -481,6 +507,8 @@ export default function FocusTimer({
             </div>
           </div>
           <div className="flex flex-col items-center w-full max-w-md mx-auto">
+            {/* Simulate session name input skeleton */}
+            <Skeleton className="w-full h-10 rounded-md mb-3" />
             <Skeleton className="w-full h-10 rounded-md mb-4" />
             <div className="mt-6 w-full flex justify-center">
               <Skeleton className="w-80 h-10 rounded-full" />
@@ -591,9 +619,20 @@ export default function FocusTimer({
           {/* Timer controls - Not during break prompt */}
           {!showBreakPrompt && !isActive && (
             <div className="w-full space-y-3">
+              {/* --- Session Name Input --- */}
+              <Input
+                type="text"
+                placeholder="Nombre de la sesión (opcional)"
+                value={sessionNameInput}
+                onChange={(e) => setSessionNameInput(e.target.value)}
+                className="bg-gray-800 border-gray-700 text-white placeholder-gray-500 h-9 text-sm" // Adjusted style
+                disabled={loading}
+                maxLength={100} // Optional: Add a max length
+              />
+              {/* ------------------------ */}
               <div className="flex gap-3">
                 <Button
-                  className="bg-purple-600 hover:bg-purple-700 flex-1"
+                  className="bg-purple-600 hover:bg-purple-700 flex-1 h-9" // Adjusted height
                   onClick={startTimer}
                   disabled={loading}
                 >
@@ -685,7 +724,7 @@ export default function FocusTimer({
           )}
 
           {/* Audio player moved inside the centered container */}
-          <div className="mt-6 w-full flex justify-center">
+          <div className="mt-3 w-full">
             <AudioPlayer />
           </div>
 

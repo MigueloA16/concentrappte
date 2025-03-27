@@ -13,7 +13,7 @@ export default async function DashboardPage() {
   // Get today's sessions - order by end_time
   const today = new Date();
   const todayISOString = today.toISOString().split('T')[0]; // YYYY-MM-DD format
-  
+
   const { data: todaySessions } = await supabase
     .from("focus_sessions")
     .select(`
@@ -32,10 +32,10 @@ export default async function DashboardPage() {
   // Get session stats for the last 7 and 30 days
   const lastWeekDate = new Date(today);
   lastWeekDate.setDate(today.getDate() - 7);
-  
+
   const lastMonthDate = new Date(today);
   lastMonthDate.setDate(today.getDate() - 30);
-  
+
   const { data: periodSessions } = await supabase
     .from("focus_sessions")
     .select(`duration_minutes, end_time`)
@@ -43,17 +43,17 @@ export default async function DashboardPage() {
     .gte("end_time", lastMonthDate.toISOString());
 
   // Calculate stats for the periods
-  const last7Days = periodSessions?.filter(session => 
+  const last7Days = periodSessions?.filter(session =>
     new Date(session.end_time || '') >= lastWeekDate
   ).reduce((sum, session) => sum + (session.duration_minutes || 0), 0) || 0;
-  
-  const last30Days = periodSessions?.reduce((sum, session) => 
+
+  const last30Days = periodSessions?.reduce((sum, session) =>
     sum + (session.duration_minutes || 0), 0) || 0;
 
   // Get daily activity data for heatmap
   const startDate = new Date(today);
   startDate.setFullYear(today.getFullYear(), 0, 1); // Start of year
-  
+
   const { data: activityData } = await supabase
     .from("daily_activity")
     .select("*")
@@ -97,7 +97,7 @@ export default async function DashboardPage() {
   // Format achievements for the client component, including ALL achievements
   const achievementsWithProgress = allAchievements?.map(achievement => {
     const userProgress = userAchievementsMap.get(achievement.id);
-    
+
     return {
       ...achievement,
       progress: userProgress?.progress || 0,

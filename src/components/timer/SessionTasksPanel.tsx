@@ -486,11 +486,11 @@ const SessionTasksPanel: React.FC<SessionTasksPanelProps> = ({
     const getStatusBadge = (status: string) => {
         switch (status) {
             case "in_progress":
-                return <Badge className="bg-blue-600 hover:bg-blue-700 animate-pulse">En progreso</Badge>;
+                return <Badge className="bg-blue-400 hover:bg-blue-500 animate-pulse">En progreso</Badge>;
             case "pending":
-                return <Badge className="bg-yellow-600 hover:bg-yellow-700">Pendiente</Badge>;
+                return <Badge className="bg-yellow-400 hover:bg-yellow-500">Pendiente</Badge>;
             default:
-                return <Badge className="bg-gray-600 hover:bg-gray-700">{status}</Badge>;
+                return <Badge className="bg-gray-400 hover:bg-gray-500">{status}</Badge>;
         }
     };
 

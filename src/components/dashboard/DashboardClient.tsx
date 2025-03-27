@@ -7,14 +7,13 @@ import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/lib/supabase/client";
-import { toast } from "sonner";
 import RecentAchievements from "@/components/achievements/RecentAchievements";
+import RecentSessions from "@/components/dashboard/RecentSessions"; // Import the new component
 import { ActivityHeatmap } from "@/components/dashboard/ActivityHeatmap";
 import {
   Trophy,
   Edit2,
   Save,
-  Calendar,
   Clock,
   BarChart,
   Target,
@@ -26,8 +25,10 @@ import { Skeleton } from "@/components/ui/skeleton";
 import {
   ProfileWithLevel,
   DailyActivity,
-  AchievementWithProgress
+  AchievementWithProgress,
+  FocusSession
 } from "@/lib/supabase/database.types";
+import { toast } from "sonner";
 
 // Define level thresholds in minutes
 const LEVELS = [
@@ -80,14 +81,6 @@ const getNextLevelInfo = (totalMinutes: number) => {
   return { name: nextLevel.name, minutesNeeded };
 };
 
-type FocusSession = {
-  id: string;
-  duration_minutes: number;
-  start_time: string;
-  end_time: string;
-  task?: { name: string };
-};
-
 interface DashboardClientProps {
   initialProfile: ProfileWithLevel;
   initialRecentSessions: FocusSession[];
@@ -128,6 +121,7 @@ export default function DashboardClient({
   const [loading, setLoading] = useState(false);
   const [isStatsLoading, setIsStatsLoading] = useState(initialActivityData.length === 0);
   const [isAchievementsLoading, setIsAchievementsLoading] = useState(initialAchievements.length === 0);
+  const [isSessionsLoading, setIsSessionsLoading] = useState(initialRecentSessions.length === 0);
 
   // Get current level info
   const currentLevel = getUserLevel(profile.total_focus_time || 0);
@@ -143,7 +137,11 @@ export default function DashboardClient({
     if (initialAchievements.length > 0) {
       setIsAchievementsLoading(false);
     }
-  }, [initialActivityData, initialAchievements]);
+
+    if (initialRecentSessions.length > 0) {
+      setIsSessionsLoading(false);
+    }
+  }, [initialActivityData, initialAchievements, initialRecentSessions]);
 
   // Save motivation text
   const saveMotivation = async () => {
@@ -224,6 +222,36 @@ export default function DashboardClient({
   // Calculate today's total minutes from session data
   const calculateTodaysTotalMinutes = () => {
     return recentSessions.reduce((total, session) => total + (session.duration_minutes || 0), 0);
+  };
+
+  // Refresh sessions when updated
+  const handleSessionsUpdated = async () => {
+    try {
+      setIsSessionsLoading(true);
+
+      const today = new Date();
+      const todayISOString = today.toISOString().split('T')[0];
+
+      const { data, error } = await supabase
+        .from("focus_sessions")
+        .select(`
+          *,
+          task:task_id (id, name)
+        `)
+        .eq("user_id", profile?.id || '')
+        .gte("end_time", todayISOString)
+        .lt("end_time", new Date(today.getTime() + 86400000).toISOString().split('T')[0])
+        .order("end_time", { ascending: false });
+
+      if (error) throw error;
+
+      setRecentSessions(data || []);
+    } catch (error) {
+      console.error("Error refreshing sessions:", error);
+      toast.error("Error al actualizar sesiones");
+    } finally {
+      setIsSessionsLoading(false);
+    }
   };
 
   return (
@@ -383,40 +411,6 @@ export default function DashboardClient({
               <p className="text-gray-300 italic text-lg">"{profile.daily_motivation || 'Focus on the process, not just the outcome'}"</p>
             )}
           </div>
-
-          {/* Focus Data section */}
-          {/* <div className="border-t border-gray-800 px-6 py-4">
-            <h3 className="text-lg font-semibold text-white mb-4">Datos de Enfoque</h3>
-            <div className="grid grid-cols-2 gap-4">
-              {isStatsLoading ? (
-                <>
-                  <Skeleton className="h-16 bg-[#262638]" />
-                  <Skeleton className="h-16 bg-[#262638]" />
-                </>
-              ) : (
-                <>
-                  <div className="bg-[#262638] p-3 rounded-lg text-center">
-                    <div className="flex flex-col items-center justify-center">
-                      <div className="flex items-center gap-1">
-                        <Calendar className="h-4 w-4 text-purple-400" />
-                        <span className="text-gray-400 text-sm">Últimos 7 días</span>
-                      </div>
-                      <div className="text-xl font-bold text-purple-400 mt-1">{formatMinutes(periodStats.last7Days)}</div>
-                    </div>
-                  </div>
-                  <div className="bg-[#262638] p-3 rounded-lg text-center">
-                    <div className="flex flex-col items-center justify-center">
-                      <div className="flex items-center gap-1">
-                        <Calendar className="h-4 w-4 text-purple-400" />
-                        <span className="text-gray-400 text-sm">Últimos 30 días</span>
-                      </div>
-                      <div className="text-xl font-bold text-purple-400 mt-1">{formatMinutes(periodStats.last30Days)}</div>
-                    </div>
-                  </div>
-                </>
-              )}
-            </div>
-          </div> */}
         </Card>
 
         {/* Right column: Today's Focus and Total Progress */}
@@ -543,11 +537,28 @@ export default function DashboardClient({
         </Card>
       </div>
 
-      <div className="mt-6 mb-6">
-        <RecentAchievements
-          achievements={achievements}
-          isLoading={isAchievementsLoading}
-        />
+      {/* Side-by-side Recent Sessions and Achievements for desktop */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Recent Sessions */}
+        <div className="h-full flex flex-col">
+          <div className="flex-1 flex flex-col">
+            <RecentSessions
+              sessions={recentSessions}
+              isLoading={isSessionsLoading}
+              onSessionUpdated={handleSessionsUpdated}
+            />
+          </div>
+        </div>
+
+        {/* Recent Achievements */}
+        <div className="h-full flex flex-col">
+          <div className="flex-1 flex flex-col">
+            <RecentAchievements
+              achievements={achievements}
+              isLoading={isAchievementsLoading}
+            />
+          </div>
+        </div>
       </div>
 
       {/* Activity Heatmap */}
