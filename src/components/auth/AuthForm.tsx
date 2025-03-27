@@ -39,8 +39,8 @@ export default function AuthForm({ view }: AuthFormProps) {
       // Check if we have a session already
       const { data } = await supabase.auth.getSession();
       if (data.session) {
-        // We're logged in, redirect to dashboard
-        router.push('/dashboard');
+        // We're logged in, redirect to hub
+        router.push('/hub');
       }
     };
     
@@ -93,7 +93,7 @@ export default function AuthForm({ view }: AuthFormProps) {
         // Force a refresh to ensure profile is created
         await fetch('/api/auth/refresh-session', { method: 'POST' });
         
-        router.push("/dashboard");
+        router.push("/hub");
         router.refresh();
       }
     } catch (error: any) {

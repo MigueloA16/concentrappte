@@ -37,6 +37,6 @@ export async function GET(request: NextRequest) {
     )
   }
 
-  // If successful, redirect to dashboard
-  return NextResponse.redirect(`${requestUrl.origin}/dashboard`)
+  // If successful, redirect to hub
+  return NextResponse.redirect(`${requestUrl.origin}/hub`)
 }

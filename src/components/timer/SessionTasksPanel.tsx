@@ -57,6 +57,23 @@ const SessionTasksPanel: React.FC<SessionTasksPanelProps> = ({
     const [taskTimeTracking, setTaskTimeTracking] = useState<TaskTimeTracking[]>([]);
     const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
     const [isExpanded, setIsExpanded] = useState(true);
+    const [isMobile, setIsMobile] = useState(false);
+
+    // Check for mobile screen size
+    useEffect(() => {
+        const checkIsMobile = () => {
+            setIsMobile(window.innerWidth < 640);
+        };
+
+        // Initial check
+        checkIsMobile();
+
+        // Add event listener for window resize
+        window.addEventListener('resize', checkIsMobile);
+
+        // Cleanup
+        return () => window.removeEventListener('resize', checkIsMobile);
+    }, []);
 
     // Fetch available tasks
     useEffect(() => {
@@ -85,38 +102,37 @@ const SessionTasksPanel: React.FC<SessionTasksPanelProps> = ({
     // Update tracking times for tasks
     const updateTaskTimes = () => {
         setTaskTimeTracking(prev => {
-          const updated = prev.map(taskTime => {
-            if (taskTime.isTracking) {
-              // Calculate time based on the elapsed time since startTime
-              // This ensures tracking continues even when switching tabs
-              if (taskTime.startTime) {
-                const now = new Date();
-                const elapsedSeconds = Math.floor((now.getTime() - taskTime.startTime.getTime()) / 1000);
-                const startSeconds = taskTime.totalSeconds - (taskTime.lastUpdatedSeconds || 0);
-                
-                return {
-                  ...taskTime,
-                  totalSeconds: startSeconds + elapsedSeconds,
-                  lastUpdatedSeconds: elapsedSeconds
-                };
-              } else {
-                // If no startTime, just increment by 1 as a fallback
-                return {
-                  ...taskTime,
-                  totalSeconds: taskTime.totalSeconds + 1
-                };
-              }
-            }
-            return taskTime;
-          });
-    
-          // Save updated data to localStorage
-          saveTimingData(updated);
-    
-          return updated;
-        });
-      };
+            const updated = prev.map(taskTime => {
+                if (taskTime.isTracking) {
+                    // Calculate time based on the elapsed time since startTime
+                    // This ensures tracking continues even when switching tabs
+                    if (taskTime.startTime) {
+                        const now = new Date();
+                        const elapsedSeconds = Math.floor((now.getTime() - taskTime.startTime.getTime()) / 1000);
+                        const startSeconds = taskTime.totalSeconds - (taskTime.lastUpdatedSeconds || 0);
 
+                        return {
+                            ...taskTime,
+                            totalSeconds: startSeconds + elapsedSeconds,
+                            lastUpdatedSeconds: elapsedSeconds
+                        };
+                    } else {
+                        // If no startTime, just increment by 1 as a fallback
+                        return {
+                            ...taskTime,
+                            totalSeconds: taskTime.totalSeconds + 1
+                        };
+                    }
+                }
+                return taskTime;
+            });
+
+            // Save updated data to localStorage
+            saveTimingData(updated);
+
+            return updated;
+        });
+    };
 
     // Format seconds to mm:ss
     const formatTime = (totalSeconds: number) => {
@@ -168,7 +184,8 @@ const SessionTasksPanel: React.FC<SessionTasksPanelProps> = ({
                     taskId: task.id,
                     startTime: null,
                     totalSeconds: 0,
-                    isTracking: false
+                    isTracking: false,
+                    lastUpdatedSeconds: 0
                 };
             });
 
@@ -556,118 +573,228 @@ const SessionTasksPanel: React.FC<SessionTasksPanelProps> = ({
                                 </Button>
                             </div>
                         )}
-
                         <div className="space-y-1.5 max-h-64 overflow-y-auto">
                             {tasks.length > 0 ? (
                                 tasks.map((task) => {
                                     // Find tracking info for this task
                                     const tracking = taskTimeTracking.find(t => t.taskId === task.id);
+                                    const isTracking = tracking?.isTracking || false;
 
                                     return (
                                         <div
                                             key={task.id}
-                                            className="flex items-center justify-between text-xs py-2 px-2 rounded-md bg-[#1a1a2e]"
+                                            className="py-2 px-2 rounded-md bg-[#1a1a2e]"
                                         >
-                                            <div className="flex-1 min-w-0">
-                                                <div className="flex items-center gap-2">
-                                                    <span className="truncate">{task.name}</span>
-                                                    {getStatusBadge(task.status)}
-                                                </div>
+                                            {/* Mobile Layout */}
+                                            {isMobile && (
+                                                <div className="flex flex-col text-xs">
+                                                    {/* First Row: Status Badge and Action Buttons */}
+                                                    <div className="flex justify-between mb-2">
+                                                        <div className="flex items-center">
+                                                            {getStatusBadge(task.status)}
+                                                            {tracking && isTracking && (
+                                                                <div className="text-blue-400 ml-2 flex">
+                                                                    <Clock className="h-3 w-3 mr-1" />
+                                                                    <span>{formatTime(tracking.totalSeconds)}</span>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                        {/* Action Buttons */}
+                                                        <div className="flex space-x-1 ml-auto">
+                                                            {/* Mark as completed */}
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="sm"
+                                                                onClick={() => updateTaskStatus(task.id, "completed")}
+                                                                className="h-7 w-7 p-0 text-green-400 hover:text-green-300 hover:bg-green-900/20"
+                                                                disabled={actionLoading}
+                                                                title="Mark as completed"
+                                                            >
+                                                                <CheckCircle2 className="h-3.5 w-3.5" />
+                                                            </Button>
 
-                                                {/* Show tracking time if tracking */}
-                                                {tracking && tracking.isTracking && (
-                                                    <div className="text-xs text-blue-400 mt-1 flex items-center">
-                                                        <Clock className="h-3 w-3 mr-1" />
-                                                        <span>Tiempo: {formatTime(tracking?.totalSeconds || 0)}</span>
+                                                            {/* Toggle time tracking */}
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="sm"
+                                                                onClick={() => toggleTaskTracking(task.id)}
+                                                                className={`h-7 w-7 p-0 ${isTracking
+                                                                    ? "text-yellow-400 hover:text-yellow-300 hover:bg-yellow-900/20"
+                                                                    : "text-blue-400 hover:text-blue-300 hover:bg-blue-900/20"
+                                                                    }`}
+                                                                disabled={actionLoading || isSessionCompleted}
+                                                                title={isTracking ? "Pause tracking" : "Start tracking"}
+                                                            >
+                                                                {isTracking ? (
+                                                                    <Pause className="h-3.5 w-3.5" />
+                                                                ) : (
+                                                                    <Play className="h-3.5 w-3.5" />
+                                                                )}
+                                                            </Button>
+
+                                                            {/* More options dropdown */}
+                                                            <DropdownMenu>
+                                                                <DropdownMenuTrigger asChild>
+                                                                    <Button
+                                                                        variant="ghost"
+                                                                        size="sm"
+                                                                        className="h-7 w-7 p-0 text-gray-400 hover:text-gray-300"
+                                                                        disabled={actionLoading}
+                                                                    >
+                                                                        <MoreVertical className="h-3.5 w-3.5" />
+                                                                    </Button>
+                                                                </DropdownMenuTrigger>
+                                                                <DropdownMenuContent
+                                                                    align="end"
+                                                                    className="w-[160px] bg-[#262638] border-gray-700 text-white text-xs"
+                                                                >
+                                                                    <DropdownMenuLabel className="text-xs">Acciones</DropdownMenuLabel>
+                                                                    <DropdownMenuSeparator className="bg-gray-700" />
+
+                                                                    {/* Status update options based on current status */}
+                                                                    {task.status === "pending" && (
+                                                                        <DropdownMenuItem
+                                                                            className="cursor-pointer flex items-center hover:bg-gray-700 text-xs"
+                                                                            onClick={() => updateTaskStatus(task.id, "in_progress")}
+                                                                        >
+                                                                            <Clock className="h-3.5 w-3.5 mr-2 text-blue-400" />
+                                                                            <span>Marcar en progreso</span>
+                                                                        </DropdownMenuItem>
+                                                                    )}
+
+                                                                    {task.status === "in_progress" && (
+                                                                        <DropdownMenuItem
+                                                                            className="cursor-pointer flex items-center hover:bg-gray-700 text-xs"
+                                                                            onClick={() => updateTaskStatus(task.id, "pending")}
+                                                                        >
+                                                                            <XCircle className="h-3.5 w-3.5 mr-2 text-yellow-400" />
+                                                                            <span>Marcar pendiente</span>
+                                                                        </DropdownMenuItem>
+                                                                    )}
+
+                                                                    <DropdownMenuSeparator className="bg-gray-700" />
+
+                                                                    {/* Delete option */}
+                                                                    <DropdownMenuItem
+                                                                        className="cursor-pointer flex items-center text-red-400 hover:bg-red-900/20 hover:text-red-300 text-xs"
+                                                                        onClick={() => deleteTask(task.id)}
+                                                                    >
+                                                                        <Trash className="h-3.5 w-3.5 mr-2" />
+                                                                        <span>Eliminar</span>
+                                                                    </DropdownMenuItem>
+                                                                </DropdownMenuContent>
+                                                            </DropdownMenu>
+                                                        </div>
                                                     </div>
-                                                )}
-                                            </div>
 
-                                            <div className="flex items-center gap-1 ml-2">
-                                                {/* Toggle time tracking button */}
-                                                <Button
-                                                    variant="ghost"
-                                                    size="sm"
-                                                    onClick={() => toggleTaskTracking(task.id)}
-                                                    className={`h-7 w-7 p-0 ${tracking?.isTracking
-                                                        ? "text-yellow-400 hover:text-yellow-300 hover:bg-yellow-900/20"
-                                                        : "text-blue-400 hover:text-blue-300 hover:bg-blue-900/20"
-                                                        }`}
-                                                    disabled={actionLoading || isSessionCompleted}
-                                                    title={tracking?.isTracking ? "Pause tracking" : "Start tracking"}
-                                                >
-                                                    {tracking?.isTracking ? (
-                                                        <Pause className="h-3.5 w-3.5" />
-                                                    ) : (
-                                                        <Play className="h-3.5 w-3.5" />
-                                                    )}
-                                                </Button>
+                                                    {/* Second Row: Task Name */}
+                                                    <div className="font-medium text-white break-words text-left pr-2">{task.name}</div>
+                                                </div>
+                                            )}
+                                            {/* Desktop Layout */}
+                                            {!isMobile && (
+                                                <div className="flex items-center justify-between text-xs">
+                                                    <div className="flex-1 min-w-0">
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="truncate">{task.name}</span>
+                                                            {getStatusBadge(task.status)}
+                                                        </div>
 
-                                                {/* Complete task button */}
-                                                <Button
-                                                    variant="ghost"
-                                                    size="sm"
-                                                    onClick={() => updateTaskStatus(task.id, "completed")}
-                                                    className="h-7 w-7 p-0 text-green-400 hover:text-green-300 hover:bg-green-900/20"
-                                                    disabled={actionLoading}
-                                                    title="Mark as completed"
-                                                >
-                                                    <CheckCircle2 className="h-3.5 w-3.5" />
-                                                </Button>
+                                                        {/* Show tracking time if tracking */}
+                                                        {tracking && tracking.isTracking && (
+                                                            <div className="text-xs text-blue-400 mt-1 flex items-center">
+                                                                <Clock className="h-3 w-3 mr-1" />
+                                                                <span>Tiempo: {formatTime(tracking?.totalSeconds || 0)}</span>
+                                                            </div>
+                                                        )}
+                                                    </div>
 
-                                                {/* Action menu */}
-                                                <DropdownMenu>
-                                                    <DropdownMenuTrigger asChild>
+                                                    <div className="flex items-center gap-1 ml-2">
+                                                        {/* Toggle time tracking button */}
                                                         <Button
                                                             variant="ghost"
                                                             size="sm"
-                                                            className="h-7 w-7 p-0 text-gray-400 hover:text-gray-300"
-                                                            disabled={actionLoading}
+                                                            onClick={() => toggleTaskTracking(task.id)}
+                                                            className={`h-7 w-7 p-0 ${tracking?.isTracking
+                                                                ? "text-yellow-400 hover:text-yellow-300 hover:bg-yellow-900/20"
+                                                                : "text-blue-400 hover:text-blue-300 hover:bg-blue-900/20"
+                                                                }`}
+                                                            disabled={actionLoading || isSessionCompleted}
+                                                            title={tracking?.isTracking ? "Pause tracking" : "Start tracking"}
                                                         >
-                                                            <MoreVertical className="h-3.5 w-3.5" />
+                                                            {tracking?.isTracking ? (
+                                                                <Pause className="h-3.5 w-3.5" />
+                                                            ) : (
+                                                                <Play className="h-3.5 w-3.5" />
+                                                            )}
                                                         </Button>
-                                                    </DropdownMenuTrigger>
-                                                    <DropdownMenuContent
-                                                        align="end"
-                                                        className="w-[160px] bg-[#262638] border-gray-700 text-white text-xs"
-                                                    >
-                                                        <DropdownMenuLabel className="text-xs">Acciones</DropdownMenuLabel>
-                                                        <DropdownMenuSeparator className="bg-gray-700" />
 
-                                                        {/* Status update options based on current status */}
-                                                        {task.status === "pending" && (
-                                                            <DropdownMenuItem
-                                                                className="cursor-pointer flex items-center hover:bg-gray-700 text-xs"
-                                                                onClick={() => updateTaskStatus(task.id, "in_progress")}
-                                                            >
-                                                                <Clock className="h-3.5 w-3.5 mr-2 text-blue-400" />
-                                                                <span>Marcar en progreso</span>
-                                                            </DropdownMenuItem>
-                                                        )}
-
-                                                        {task.status === "in_progress" && (
-                                                            <DropdownMenuItem
-                                                                className="cursor-pointer flex items-center hover:bg-gray-700 text-xs"
-                                                                onClick={() => updateTaskStatus(task.id, "pending")}
-                                                            >
-                                                                <XCircle className="h-3.5 w-3.5 mr-2 text-yellow-400" />
-                                                                <span>Marcar pendiente</span>
-                                                            </DropdownMenuItem>
-                                                        )}
-
-                                                        <DropdownMenuSeparator className="bg-gray-700" />
-
-                                                        {/* Delete option */}
-                                                        <DropdownMenuItem
-                                                            className="cursor-pointer flex items-center text-red-400 hover:bg-red-900/20 hover:text-red-300 text-xs"
-                                                            onClick={() => deleteTask(task.id)}
+                                                        {/* Complete task button */}
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            onClick={() => updateTaskStatus(task.id, "completed")}
+                                                            className="h-7 w-7 p-0 text-green-400 hover:text-green-300 hover:bg-green-900/20"
+                                                            disabled={actionLoading}
+                                                            title="Mark as completed"
                                                         >
-                                                            <Trash className="h-3.5 w-3.5 mr-2" />
-                                                            <span>Eliminar</span>
-                                                        </DropdownMenuItem>
-                                                    </DropdownMenuContent>
-                                                </DropdownMenu>
-                                            </div>
+                                                            <CheckCircle2 className="h-3.5 w-3.5" />
+                                                        </Button>
+
+                                                        {/* Action menu */}
+                                                        <DropdownMenu>
+                                                            <DropdownMenuTrigger asChild>
+                                                                <Button
+                                                                    variant="ghost"
+                                                                    size="sm"
+                                                                    className="h-7 w-7 p-0 text-gray-400 hover:text-gray-300"
+                                                                    disabled={actionLoading}
+                                                                >
+                                                                    <MoreVertical className="h-3.5 w-3.5" />
+                                                                </Button>
+                                                            </DropdownMenuTrigger>
+                                                            <DropdownMenuContent
+                                                                align="end"
+                                                                className="w-[160px] bg-[#262638] border-gray-700 text-white text-xs"
+                                                            >
+                                                                <DropdownMenuLabel className="text-xs">Acciones</DropdownMenuLabel>
+                                                                <DropdownMenuSeparator className="bg-gray-700" />
+
+                                                                {/* Status update options based on current status */}
+                                                                {task.status === "pending" && (
+                                                                    <DropdownMenuItem
+                                                                        className="cursor-pointer flex items-center hover:bg-gray-700 text-xs"
+                                                                        onClick={() => updateTaskStatus(task.id, "in_progress")}
+                                                                    >
+                                                                        <Clock className="h-3.5 w-3.5 mr-2 text-blue-400" />
+                                                                        <span>Marcar en progreso</span>
+                                                                    </DropdownMenuItem>
+                                                                )}
+                                                                {task.status === "in_progress" && (
+                                                                    <DropdownMenuItem
+                                                                        className="cursor-pointer flex items-center hover:bg-gray-700 text-xs"
+                                                                        onClick={() => updateTaskStatus(task.id, "pending")}
+                                                                    >
+                                                                        <XCircle className="h-3.5 w-3.5 mr-2 text-yellow-400" />
+                                                                        <span>Marcar pendiente</span>
+                                                                    </DropdownMenuItem>
+                                                                )}
+
+                                                                <DropdownMenuSeparator className="bg-gray-700" />
+
+                                                                {/* Delete option */}
+                                                                <DropdownMenuItem
+                                                                    className="cursor-pointer flex items-center text-red-400 hover:bg-red-900/20 hover:text-red-300 text-xs"
+                                                                    onClick={() => deleteTask(task.id)}
+                                                                >
+                                                                    <Trash className="h-3.5 w-3.5 mr-2" />
+                                                                    <span>Eliminar</span>
+                                                                </DropdownMenuItem>
+                                                            </DropdownMenuContent>
+                                                        </DropdownMenu>
+                                                    </div>
+                                                </div>
+                                            )}
                                         </div>
                                     );
                                 })

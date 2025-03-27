@@ -55,9 +55,9 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url)
   }
   
-  // If user is authenticated and tries to access auth pages, redirect to dashboard
+  // If user is authenticated and tries to access auth pages, redirect to hub
   if (user && isAuthPath && !request.nextUrl.pathname.startsWith('/auth/callback')) {
-    return NextResponse.redirect(new URL('/dashboard', request.url))
+    return NextResponse.redirect(new URL('/hub', request.url))
   }
 
   return supabaseResponse
