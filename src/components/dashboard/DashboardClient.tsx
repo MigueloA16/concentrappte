@@ -131,9 +131,9 @@ export default function DashboardClient({
 
   // Loading States
   const [loading, setLoading] = useState(false);
-  const [isStatsLoading, setIsStatsLoading] = useState(initialActivityData.length === 0);
-  const [isAchievementsLoading, setIsAchievementsLoading] = useState(initialAchievements.length === 0);
-  const [isSessionsLoading, setIsSessionsLoading] = useState(initialTodaySessions.length === 0);
+  const [isStatsLoading, setIsStatsLoading] = useState(false);
+  const [isAchievementsLoading, setIsAchievementsLoading] = useState(false);
+  const [isSessionsLoading, setIsSessionsLoading] = useState(false);
 
   // Memoized Calculations
   const levelInfo = useMemo(() => {

@@ -79,19 +79,38 @@ export default function AuthForm({ view }: AuthFormProps) {
         toast.success("Registro exitoso! Por favor revisa tu email para verificar tu cuenta.");
         router.push("/auth/verify");
       } else {
-        const { error } = await supabase.auth.signInWithPassword({
+        // First attempt to sign in
+        const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
           email,
           password,
         });
 
-        if (error) {
-          throw error;
+        if (signInError) {
+          // Handle specific error cases with more user-friendly messages
+          if (signInError.message.includes("Invalid login credentials")) {
+            throw new Error("El correo o la contraseña no son correctos. Por favor intenta nuevamente.");
+          }
+          throw signInError;
         }
 
         toast.success("Ingresaste exitosamente!");
 
         // Force a refresh to ensure profile is created
-        await fetch('/api/auth/refresh-session', { method: 'POST' });
+        try {
+          const response = await fetch('/api/auth/refresh-session', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            }
+          });
+
+          if (!response.ok) {
+            console.warn('Profile refresh failed, but login successful');
+          }
+        } catch (refreshError) {
+          console.warn('Error refreshing profile, but login successful:', refreshError);
+          // Don't block login if profile refresh fails
+        }
 
         router.push("/hub");
         router.refresh();
