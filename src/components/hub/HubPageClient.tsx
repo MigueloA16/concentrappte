@@ -35,15 +35,15 @@ type Profile = {
 
 interface HubPageClientProps {
   initialTimerSettings: TimerSetting;
-  initialRecentTasks: Task[];
-  initialRecentSessions: FocusSession[];
+  initialAllTasks: Task[];
+  initialTodaySessions: FocusSession[];
   initialProfile: Profile;
 }
 
 export default function HubPageClient({
   initialTimerSettings,
-  initialRecentTasks,
-  initialRecentSessions,
+  initialAllTasks,
+  initialTodaySessions,
   initialProfile
 }: HubPageClientProps) {
   const searchParams = useSearchParams();
@@ -51,8 +51,8 @@ export default function HubPageClient({
 
   const [activeTab, setActiveTab] = useState(tabParam || "timer");
   const [timerSettings, setTimerSettings] = useState<TimerSetting | null>(initialTimerSettings);
-  const [recentTasks, setRecentTasks] = useState<Task[]>(initialRecentTasks || []);
-  const [recentSessions, setRecentSessions] = useState<FocusSession[]>(initialRecentSessions || []);
+  const [allTasks, setAllTasks] = useState<Task[]>(initialAllTasks || []);
+  const [todaySessions, setTodaySessions] = useState<FocusSession[]>(initialTodaySessions || []);
   const [profile, setProfile] = useState<Profile>(initialProfile);
   const [loading, setLoading] = useState(false);
 
@@ -99,17 +99,16 @@ export default function HubPageClient({
         setTimerSettings(settings);
       }
 
-      // Fetch recent tasks - ensure we filter out deleted tasks
+      // Fetch all the tasks for the user after any update
       const { data: tasks, error: tasksError } = await supabase
         .from("tasks")
         .select("*")
         .eq("user_id", user.id)
         .eq("deleted", false)
-        .order("created_at", { ascending: false })
-        .limit(5);
+        .order("created_at", { ascending: false });
 
       if (tasksError) throw tasksError;
-      setRecentTasks(tasks || []);
+      setAllTasks(tasks || []);
 
       // Get today's date in YYYY-MM-DD format
       const today = new Date();
@@ -125,7 +124,7 @@ export default function HubPageClient({
         .order("end_time", { ascending: false });
 
       if (sessionsError) throw sessionsError;
-      setRecentSessions(sessions || []);
+      setTodaySessions(sessions || []);
 
       // Fetch user profile
       const { data: userProfile, error: profileError } = await supabase
@@ -168,7 +167,7 @@ export default function HubPageClient({
 
   // Calculate today's total minutes
   const calculateTodaysTotalMinutes = () => {
-    return recentSessions.reduce((total, session) => total + (session.duration_minutes || 0), 0);
+    return todaySessions.reduce((total, session) => total + (session.duration_minutes || 0), 0);
   };
 
   return (
@@ -218,7 +217,7 @@ export default function HubPageClient({
             {/* Tasks Tab Content */}
             <TabsContent value="tasks" className="mt-6">
               <TaskManager
-                tasks={recentTasks || []}
+                tasks={allTasks || []}
                 onTasksChanged={handleTasksChanged}
               />
             </TabsContent>
@@ -292,7 +291,7 @@ export default function HubPageClient({
                   <div className="bg-[#262638] p-3 rounded-lg text-center">
                     <div className="text-gray-400 text-xs mb-1">Sesiones</div>
                     <div className="text-xl font-bold text-purple-400">
-                      {recentSessions.length}
+                      {todaySessions.length}
                     </div>
                   </div>
                   <div className="bg-[#262638] p-3 rounded-lg text-center">

@@ -83,7 +83,7 @@ const getNextLevelInfo = (totalMinutes: number) => {
 
 interface DashboardClientProps {
   initialProfile: ProfileWithLevel;
-  initialRecentSessions: FocusSession[];
+  initialTodaySessions: FocusSession[];
   initialAchievements?: AchievementWithProgress[];
   initialActivityData?: DailyActivity[];
   periodStats?: {
@@ -98,7 +98,7 @@ interface DashboardClientProps {
 
 export default function DashboardClient({
   initialProfile,
-  initialRecentSessions,
+  initialTodaySessions,
   initialAchievements = [],
   initialActivityData = [],
   periodStats = { last7Days: 0, last30Days: 0 },
@@ -111,7 +111,7 @@ export default function DashboardClient({
     best_streak: initialProfile.best_streak || 0,
     levelProgress: 0
   });
-  const [recentSessions, setRecentSessions] = useState<FocusSession[]>(initialRecentSessions || []);
+  const [todaySessions, setTodaySessions] = useState<FocusSession[]>(initialTodaySessions || []);
   const [achievements, setAchievements] = useState<AchievementWithProgress[]>(initialAchievements);
   const [activityData, setActivityData] = useState<DailyActivity[]>(initialActivityData);
   const [editingMotivation, setEditingMotivation] = useState(false);
@@ -121,7 +121,7 @@ export default function DashboardClient({
   const [loading, setLoading] = useState(false);
   const [isStatsLoading, setIsStatsLoading] = useState(initialActivityData.length === 0);
   const [isAchievementsLoading, setIsAchievementsLoading] = useState(initialAchievements.length === 0);
-  const [isSessionsLoading, setIsSessionsLoading] = useState(initialRecentSessions.length === 0);
+  const [isSessionsLoading, setIsSessionsLoading] = useState(initialTodaySessions.length === 0);
 
   // Get current level info
   const currentLevel = getUserLevel(profile.total_focus_time || 0);
@@ -138,10 +138,10 @@ export default function DashboardClient({
       setIsAchievementsLoading(false);
     }
 
-    if (initialRecentSessions.length > 0) {
+    if (initialTodaySessions.length > 0) {
       setIsSessionsLoading(false);
     }
-  }, [initialActivityData, initialAchievements, initialRecentSessions]);
+  }, [initialActivityData, initialAchievements, initialTodaySessions]);
 
   // Save motivation text
   const saveMotivation = async () => {
@@ -221,7 +221,7 @@ export default function DashboardClient({
 
   // Calculate today's total minutes from session data
   const calculateTodaysTotalMinutes = () => {
-    return recentSessions.reduce((total, session) => total + (session.duration_minutes || 0), 0);
+    return todaySessions.reduce((total, session) => total + (session.duration_minutes || 0), 0);
   };
 
   // Refresh sessions when updated
@@ -245,7 +245,7 @@ export default function DashboardClient({
 
       if (error) throw error;
 
-      setRecentSessions(data || []);
+      setTodaySessions(data || []);
     } catch (error) {
       console.error("Error refreshing sessions:", error);
       toast.error("Error al actualizar sesiones");
@@ -434,7 +434,7 @@ export default function DashboardClient({
                 <>
                   <div className="bg-[#262638] p-4 rounded-lg">
                     <div className="text-gray-400 text-sm mb-1">Sesiones</div>
-                    <div className="text-2xl font-bold text-purple-400">{recentSessions.length}</div>
+                    <div className="text-2xl font-bold text-purple-400">{todaySessions.length}</div>
                   </div>
                   <div className="bg-[#262638] p-4 rounded-lg">
                     <div className="text-gray-400 text-sm mb-1">Duración</div>
@@ -543,7 +543,7 @@ export default function DashboardClient({
         <div className="h-full flex flex-col">
           <div className="flex-1 flex flex-col">
             <RecentSessions
-              sessions={recentSessions}
+              sessions={todaySessions}
               isLoading={isSessionsLoading}
               onSessionUpdated={handleSessionsUpdated}
             />

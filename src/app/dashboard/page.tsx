@@ -110,7 +110,7 @@ export default async function DashboardPage() {
     <Suspense fallback={<div>Cargando...</div>}>
       <DashboardClient
         initialProfile={profile}
-        initialRecentSessions={todaySessions || []}
+        initialTodaySessions={todaySessions || []}
         initialAchievements={achievementsWithProgress}
         initialActivityData={activityData || []}
         periodStats={{
