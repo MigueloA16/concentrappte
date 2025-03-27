@@ -11,23 +11,23 @@ import { toast } from "sonner";
 import { format, subDays, isToday, startOfYear, eachDayOfInterval } from "date-fns";
 import RecentAchievements from "@/components/achievements/RecentAchievements";
 import { ActivityHeatmap } from "@/components/dashboard/ActivityHeatmap";
-import { 
-  Trophy, 
-  Edit2, 
-  Save, 
-  Calendar, 
-  Clock, 
-  BarChart, 
+import {
+  Trophy,
+  Edit2,
+  Save,
+  Calendar,
+  Clock,
+  BarChart,
   Target,
   Flame,
   Award,
   Loader2
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
-import { 
-  ProfileWithLevel, 
-  DailyActivity, 
-  AchievementWithProgress 
+import {
+  ProfileWithLevel,
+  DailyActivity,
+  AchievementWithProgress
 } from "@/lib/supabase/database.types";
 
 // Define level thresholds in minutes
@@ -57,13 +57,13 @@ const getProgressToNextLevel = (totalMinutes: number) => {
   const currentLevel = getUserLevel(totalMinutes);
   const currentLevelIndex = LEVELS.findIndex(level => level.name === currentLevel.name);
   const isMaxLevel = currentLevelIndex === LEVELS.length - 1;
-  
+
   if (isMaxLevel) return 100; // Max level reached
-  
+
   const nextLevel = LEVELS[currentLevelIndex + 1];
   const progressInCurrentLevel = totalMinutes - currentLevel.threshold;
   const currentLevelRange = nextLevel.threshold - currentLevel.threshold;
-  
+
   return Math.min(Math.round((progressInCurrentLevel / currentLevelRange) * 100), 99);
 };
 
@@ -72,12 +72,12 @@ const getNextLevelInfo = (totalMinutes: number) => {
   const currentLevel = getUserLevel(totalMinutes);
   const currentLevelIndex = LEVELS.findIndex(level => level.name === currentLevel.name);
   const isMaxLevel = currentLevelIndex === LEVELS.length - 1;
-  
+
   if (isMaxLevel) return { name: null, minutesNeeded: 0 };
-  
+
   const nextLevel = LEVELS[currentLevelIndex + 1];
   const minutesNeeded = nextLevel.threshold - totalMinutes;
-  
+
   return { name: nextLevel.name, minutesNeeded };
 };
 
@@ -95,8 +95,8 @@ interface DashboardClientProps {
   initialAchievements?: AchievementWithProgress[];
 }
 
-export default function DashboardClient({ 
-  initialProfile, 
+export default function DashboardClient({
+  initialProfile,
   initialRecentSessions,
   initialAchievements = []
 }: DashboardClientProps) {
@@ -115,7 +115,7 @@ export default function DashboardClient({
   const [targetHours, setTargetHours] = useState(profile.target_hours || 100);
   const [loading, setLoading] = useState(false);
   const [activityData, setActivityData] = useState<DailyActivity[]>([]);
-  const [todaySessions, setTodaySessions] = useState<{ count: number, minutes: number }>({ count: 0, minutes: 0 });
+  const [totalSessions, setTotalSessions] = useState<{ count: number, minutes: number }>({ count: 0, minutes: 0 });
   const [periodStats, setPeriodStats] = useState({
     last7Days: 0,
     last30Days: 0
@@ -140,52 +140,15 @@ export default function DashboardClient({
 
         // Get today's date and format it for comparison
         const today = new Date();
-        const todayStr = format(today, 'yyyy-MM-dd');
-        const sevenDaysAgo = subDays(today, 7);
-        const thirtyDaysAgo = subDays(today, 30);
-
         // Get focus sessions for the last 30 days
         const { data: sessions, error } = await supabase
           .from("focus_sessions")
           .select("duration_minutes, end_time")
           .eq("user_id", user.id)
-          .gte("end_time", thirtyDaysAgo.toISOString())
           .order("end_time", { ascending: false });
 
         if (error) throw error;
 
-        // Calculate today's sessions
-        const todaySessions = sessions.filter(session => {
-          const sessionDate = new Date(session.end_time);
-          return isToday(sessionDate);
-        });
-
-        const todayCount = todaySessions.length;
-        const todayMinutes = todaySessions.reduce((total, session) => total + (session.duration_minutes || 0), 0);
-
-        setTodaySessions({
-          count: todayCount,
-          minutes: todayMinutes
-        });
-
-        // Calculate period stats
-        let last7DaysMinutes = 0;
-        let last30DaysMinutes = 0;
-
-        sessions.forEach(session => {
-          const sessionDate = new Date(session.end_time);
-          
-          if (sessionDate >= sevenDaysAgo) {
-            last7DaysMinutes += session.duration_minutes || 0;
-          }
-          
-          last30DaysMinutes += session.duration_minutes || 0;
-        });
-
-        setPeriodStats({
-          last7Days: last7DaysMinutes,
-          last30Days: last30DaysMinutes
-        });
 
       } catch (error) {
         console.error("Error fetching stats:", error);
@@ -260,7 +223,7 @@ export default function DashboardClient({
   // Load achievements
   useEffect(() => {
     setIsAchievementsLoading(achievements.length === 0);
-    
+
     // If we already have achievements loaded, we can stop loading
     if (achievements.length > 0) {
       setIsAchievementsLoading(false);
@@ -380,8 +343,8 @@ export default function DashboardClient({
                         <span className="text-white">Nivel {LEVELS.findIndex(l => l.name === currentLevel.name) + 1}</span>
                       </div>
                       <CardDescription className="text-gray-400">
-                        {nextLevelInfo.name ? 
-                          `${formatMinutes(nextLevelInfo.minutesNeeded)} más para alcanzar el nivel ${nextLevelInfo.name}` : 
+                        {nextLevelInfo.name ?
+                          `${formatMinutes(nextLevelInfo.minutesNeeded)} más para alcanzar el nivel ${nextLevelInfo.name}` :
                           "¡Has alcanzado el nivel máximo!"
                         }
                       </CardDescription>
@@ -402,13 +365,13 @@ export default function DashboardClient({
               {isStatsLoading ? (
                 <Skeleton className="h-2 w-full" />
               ) : (
-                <Progress 
-                  value={levelProgress} 
+                <Progress
+                  value={levelProgress}
                   className="h-2 bg-gray-700"
                 />
               )}
             </div>
-            
+
             {/* Streak info */}
             <div className="mt-4 grid grid-cols-2 gap-2">
               {isStatsLoading ? (
@@ -440,14 +403,14 @@ export default function DashboardClient({
               )}
             </div>
           </CardHeader>
-          
+
           {/* Daily Motivation section */}
           <div className="border-t border-gray-800 px-6 py-4">
             <div className="flex justify-between items-center mb-2">
               <h3 className="text-lg font-semibold text-white">Motivación Diaria</h3>
-              <Button 
-                variant="ghost" 
-                size="sm" 
+              <Button
+                variant="ghost"
+                size="sm"
                 onClick={() => {
                   if (editingMotivation) {
                     saveMotivation();
@@ -458,8 +421,8 @@ export default function DashboardClient({
                 disabled={loading}
                 className="h-8 w-8 p-0"
               >
-                {editingMotivation ? 
-                  (loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4 text-green-400" />) : 
+                {editingMotivation ?
+                  (loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4 text-green-400" />) :
                   <Edit2 className="h-4 w-4 text-gray-400" />
                 }
               </Button>
@@ -474,9 +437,9 @@ export default function DashboardClient({
                   disabled={loading}
                 />
                 <div className="flex justify-end gap-2">
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
+                  <Button
+                    variant="outline"
+                    size="sm"
                     onClick={() => {
                       setEditingMotivation(false);
                       setMotivationText(profile.daily_motivation || "");
@@ -485,8 +448,8 @@ export default function DashboardClient({
                   >
                     Cancelar
                   </Button>
-                  <Button 
-                    size="sm" 
+                  <Button
+                    size="sm"
                     onClick={saveMotivation}
                     disabled={loading}
                   >
@@ -500,7 +463,7 @@ export default function DashboardClient({
               <p className="text-gray-300 italic text-lg">"{profile.daily_motivation || 'Focus on the process, not just the outcome'}"</p>
             )}
           </div>
-          
+
           {/* Focus Data section */}
           <div className="border-t border-gray-800 px-6 py-4">
             <h3 className="text-lg font-semibold text-white mb-4">Datos de Enfoque</h3>
@@ -557,17 +520,26 @@ export default function DashboardClient({
                 <>
                   <div className="bg-[#262638] p-4 rounded-lg">
                     <div className="text-gray-400 text-sm mb-1">Sesiones</div>
-                    <div className="text-2xl font-bold text-purple-400">{todaySessions.count}</div>
+                    <div className="text-2xl font-bold text-purple-400">{recentSessions.length}</div>
                   </div>
                   <div className="bg-[#262638] p-4 rounded-lg">
                     <div className="text-gray-400 text-sm mb-1">Duración</div>
-                    <div className="text-2xl font-bold text-purple-400">{formatMinutes(todaySessions.minutes)}</div>
+                    <div className="text-2xl font-bold text-purple-400">                    {(() => {
+                      // Calculate total minutes from today's sessions
+                      const todayMinutes = recentSessions
+                        .reduce((total, session) => total + (session.duration_minutes || 0), 0);
+
+                      // Format as hours and minutes
+                      const hours = Math.floor(todayMinutes / 60);
+                      const mins = todayMinutes % 60;
+                      return hours > 0 ? `${hours}h ${mins}m` : `${mins}m`;
+                    })()}</div>
                   </div>
                 </>
               )}
             </div>
           </CardContent>
-          
+
           {/* Total Progress section */}
           <div className="border-t border-gray-800 px-6 py-4">
             <div className="flex justify-between items-center mb-4">
@@ -575,9 +547,9 @@ export default function DashboardClient({
                 <BarChart className="h-5 w-5 text-purple-400" />
                 Progreso Total
               </h3>
-              <Button 
-                variant="ghost" 
-                size="sm" 
+              <Button
+                variant="ghost"
+                size="sm"
                 onClick={() => {
                   if (editingTarget) {
                     saveTargetHours();
@@ -588,13 +560,13 @@ export default function DashboardClient({
                 disabled={loading}
                 className="h-8 w-8 p-0"
               >
-                {editingTarget ? 
-                  (loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4 text-green-400" />) : 
+                {editingTarget ?
+                  (loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4 text-green-400" />) :
                   <Edit2 className="h-4 w-4 text-gray-400" />
                 }
               </Button>
             </div>
-            
+
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 {isStatsLoading ? (
@@ -615,7 +587,7 @@ export default function DashboardClient({
                   </>
                 )}
               </div>
-              
+
               {/* Target hours at the bottom */}
               <div className="mt-auto pt-4">
                 <div className="flex justify-between items-center mb-1">
@@ -642,8 +614,8 @@ export default function DashboardClient({
                   <Skeleton className="h-2 w-full mb-1" />
                 ) : (
                   <>
-                    <Progress 
-                      value={targetHoursProgress()} 
+                    <Progress
+                      value={targetHoursProgress()}
                       className="h-2 bg-gray-700"
                     />
                     <div className="flex justify-between text-xs text-gray-500 mt-1">
@@ -657,19 +629,19 @@ export default function DashboardClient({
           </div>
         </Card>
       </div>
-      
+
       <div className="mt-6 mb-6">
-        <RecentAchievements 
-          achievements={achievements} 
-          isLoading={isAchievementsLoading} 
+        <RecentAchievements
+          achievements={achievements}
+          isLoading={isAchievementsLoading}
         />
       </div>
 
       {/* Activity Heatmap */}
-      <div>
-        <ActivityHeatmap 
-          activityData={activityData} 
-          isLoading={isActivityLoading} 
+      <div className="hidden md:block">
+        <ActivityHeatmap
+          activityData={activityData}
+          isLoading={isActivityLoading}
         />
       </div>
     </div>
