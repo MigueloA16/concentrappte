@@ -11,15 +11,19 @@ export default async function DashboardPage() {
   const supabase = await createClient();
 
   // Get recent sessions - order by end_time
-  const { data: recentSessions } = await supabase
+  const today = new Date();
+  const todayISOString = today.toISOString().split('T')[0]; // YYYY-MM-DD format
+  
+  const { data: todaySessions } = await supabase
     .from("focus_sessions")
     .select(`
     *,
     task:task_id (id, name)
   `)
     .eq("user_id", profile?.id || '')
-    .order("end_time", { ascending: false })
-    .limit(10); // Increased limit to get more data for calculations
+    .gte("end_time", todayISOString) // Filter for sessions from today
+    .lt("end_time", new Date(today.getTime() + 86400000).toISOString().split('T')[0]) // Before tomorrow
+    .order("end_time", { ascending: false }); // Sufficient limit for today's sessions
 
   // Get ALL achievements
   const { data: allAchievements } = await supabase
@@ -65,18 +69,11 @@ export default async function DashboardPage() {
     };
   }) || [];
 
-  // Get daily activity data for heatmap visualization
-  const { data: dailyActivity } = await supabase
-    .from("daily_activity")
-    .select("*")
-    .eq("user_id", profile?.id || '')
-    .order("date", { ascending: true });
-
   return (
     <Suspense fallback={<div>Cargando...</div>}>
       <DashboardClient
         initialProfile={profile}
-        initialRecentSessions={recentSessions || []}
+        initialRecentSessions={todaySessions || []}
         initialAchievements={achievementsWithProgress}
       />
     </Suspense>

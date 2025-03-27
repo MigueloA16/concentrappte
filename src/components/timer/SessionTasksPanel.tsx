@@ -40,6 +40,7 @@ interface SessionTasksPanelProps {
 type TaskTimeTracking = {
     taskId: string;
     startTime: Date | null;
+    lastUpdatedSeconds: number;
     totalSeconds: number;
     isTracking: boolean;
 };
@@ -84,22 +85,37 @@ const SessionTasksPanel: React.FC<SessionTasksPanelProps> = ({
     // Update tracking times for tasks
     const updateTaskTimes = () => {
         setTaskTimeTracking(prev => {
-            const updated = prev.map(taskTime => {
-                if (taskTime.isTracking && taskTime.startTime) {
-                    return {
-                        ...taskTime,
-                        totalSeconds: taskTime.totalSeconds + 1
-                    };
-                }
-                return taskTime;
-            });
-
-            // Save updated data to localStorage
-            saveTimingData(updated);
-
-            return updated;
+          const updated = prev.map(taskTime => {
+            if (taskTime.isTracking) {
+              // Calculate time based on the elapsed time since startTime
+              // This ensures tracking continues even when switching tabs
+              if (taskTime.startTime) {
+                const now = new Date();
+                const elapsedSeconds = Math.floor((now.getTime() - taskTime.startTime.getTime()) / 1000);
+                const startSeconds = taskTime.totalSeconds - (taskTime.lastUpdatedSeconds || 0);
+                
+                return {
+                  ...taskTime,
+                  totalSeconds: startSeconds + elapsedSeconds,
+                  lastUpdatedSeconds: elapsedSeconds
+                };
+              } else {
+                // If no startTime, just increment by 1 as a fallback
+                return {
+                  ...taskTime,
+                  totalSeconds: taskTime.totalSeconds + 1
+                };
+              }
+            }
+            return taskTime;
+          });
+    
+          // Save updated data to localStorage
+          saveTimingData(updated);
+    
+          return updated;
         });
-    };
+      };
 
 
     // Format seconds to mm:ss
@@ -204,7 +220,8 @@ const SessionTasksPanel: React.FC<SessionTasksPanelProps> = ({
                     taskId: data.id,
                     startTime: null,
                     totalSeconds: 0,
-                    isTracking: false
+                    isTracking: false,
+                    lastUpdatedSeconds: 0
                 },
                 ...taskTimeTracking
             ]);
@@ -250,7 +267,7 @@ const SessionTasksPanel: React.FC<SessionTasksPanelProps> = ({
                 const trackingMinutes = tracking ? Math.ceil(tracking.totalSeconds / 60) : 0;
 
                 // Add at least 1 minute if there was any tracking time
-                if (tracking && tracking.totalSeconds > 0) {
+                if (tracking && tracking.totalSeconds >= 0) {
                     const additionalMinutes = Math.max(1, trackingMinutes);
 
                     // Get current task duration
@@ -266,7 +283,7 @@ const SessionTasksPanel: React.FC<SessionTasksPanelProps> = ({
 
                     const currentDuration = (taskData?.duration_minutes || 0);
 
-                    updates.duration_minutes = currentDuration + additionalMinutes;
+                    updates.duration_minutes = Math.max(1, currentDuration + additionalMinutes);
                 }
 
                 // Always stop tracking this task when completed

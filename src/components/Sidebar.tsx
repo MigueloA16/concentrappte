@@ -29,16 +29,16 @@ const navItems = [
     href: "/achievements",
     icon: Trophy,
   },  
-  {
-    label: "Grupos de Estudio",
-    href: "/rooms",
-    icon: Users,
-  },
-  {
-    label: "Configuración",
-    href: "/settings",
-    icon: Settings,
-  },
+  // {
+  //   label: "Grupos de Estudio",
+  //   href: "/rooms",
+  //   icon: Users,
+  // },
+  // {
+  //   label: "Configuración",
+  //   href: "/settings",
+  //   icon: Settings,
+  // },
 ];
 
 export default function Sidebar() {

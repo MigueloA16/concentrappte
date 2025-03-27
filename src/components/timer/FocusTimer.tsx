@@ -317,9 +317,7 @@ export default function FocusTimer({
     setMinutes(defaultFocusTime);
     setSeconds(0);
     setShowBreakPrompt(false);
-
-    // Increment session count when skipping break
-    setSessionCount(prevCount => prevCount + 1);
+    setIsActive(false); // Ensure timer is stopped and not auto-starting
 
     // If we've completed all sessions, reset the counter
     if (sessionCount + 1 >= defaultTargetSessions) {
@@ -328,8 +326,11 @@ export default function FocusTimer({
     } else {
       toast.info("Descanso omitido. Listo para comenzar una nueva sesión.");
     }
-  };
 
+    // Ensure current session is cleared properly
+    setCurrentSessionId(null);
+    setStartTime(null);
+  };
   // Function to finish session early
   const finishEarly = async () => {
     if (!currentSessionId || isBreak) return;
@@ -637,7 +638,7 @@ export default function FocusTimer({
                     className="border-blue-700 text-blue-400 hover:bg-blue-900/20 flex-1 h-9"
                     disabled={loading}
                   >
-                    <SkipForward  className="h-4 w-4 mr-2 flex-shrink-0" />
+                    <SkipForward className="h-4 w-4 mr-2 flex-shrink-0" />
                     <span className="text-sm">Omitir Descanso</span>
                   </Button>
                 )}

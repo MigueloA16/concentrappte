@@ -18,12 +18,19 @@ export default async function HubPage() {
     .single();
 
   // Get recent focus sessions - order by end_time now
-  const { data: recentSessions } = await supabase
+  const today = new Date();
+  const todayISOString = today.toISOString().split('T')[0]; // YYYY-MM-DD format
+  
+  const { data: todaySessions } = await supabase
     .from("focus_sessions")
-    .select("*, task:task_id(name)")
+    .select(`
+    *,
+    task:task_id (id, name)
+  `)
     .eq("user_id", profile?.id || '')
-    .order("end_time", { ascending: false })  // Order by end_time instead of start_time
-    .limit(5);
+    .gte("end_time", todayISOString) // Filter for sessions from today
+    .lt("end_time", new Date(today.getTime() + 86400000).toISOString().split('T')[0]) // Before tomorrow
+    .order("end_time", { ascending: false }); // Sufficient limit for today's sessions
     
   // Get recent tasks
   const { data: recentTasks } = await supabase
@@ -38,7 +45,7 @@ export default async function HubPage() {
       <HubPageClient 
         initialTimerSettings={timerSettings} 
         initialRecentTasks={recentTasks || []} 
-        initialRecentSessions={recentSessions || []}
+        initialRecentSessions={todaySessions || []}
         initialProfile={profile}
       />
     </Suspense>

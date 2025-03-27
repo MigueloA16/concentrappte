@@ -4,12 +4,11 @@ import { useState, useEffect } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Clock, Settings, LayoutGrid, Play } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import TimerSettings from "@/components/timer/TimerSettings";
 import FocusTimer from "@/components/timer/FocusTimer";
 import TaskManager from "@/components/timer/TaskManager";
 import { supabase } from "@/lib/supabase/client";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { Task, TimerSetting } from "@/lib/supabase/database.types";
 
 
@@ -70,40 +69,6 @@ export default function HubPageClient({
     refreshData();
   };
 
-  // Format the date for display
-  const formatDate = (dateString: string) => {
-    if (!dateString) return "";
-
-    const date = new Date(dateString);
-    // Check if the date is today
-    const today = new Date();
-    const isToday = date.getDate() === today.getDate() &&
-      date.getMonth() === today.getMonth() &&
-      date.getFullYear() === today.getFullYear();
-
-    if (isToday) {
-      // For today, show the time
-      return `Hoy ${date.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}`;
-    }
-
-    // Check if the date is yesterday
-    const yesterday = new Date(today);
-    yesterday.setDate(yesterday.getDate() - 1);
-    const isYesterday = date.getDate() === yesterday.getDate() &&
-      date.getMonth() === yesterday.getMonth() &&
-      date.getFullYear() === yesterday.getFullYear();
-
-    if (isYesterday) {
-      return "Ayer";
-    }
-
-    // Otherwise show the date
-    return date.toLocaleDateString('es-ES', {
-      day: 'numeric',
-      month: 'short'
-    });
-  };
-
   // Refresh data function for when settings or tasks are changed
   const refreshData = async () => {
     try {
@@ -152,36 +117,6 @@ export default function HubPageClient({
         .limit(5);
 
       if (sessionsError) throw sessionsError;
-
-      // Process sessions to extract session name from notes if no task
-      const processedSessions = (sessions || []).map(session => {
-        let sessionName = "Sin tarea";
-
-        // Try to get session name from notes
-        if (session.notes) {
-          try {
-            const notesObj = JSON.parse(session.notes);
-            if (notesObj.session_name) {
-              sessionName = notesObj.session_name;
-            }
-          } catch (e) {
-            // If JSON parse fails, leave default name
-          }
-        }
-
-        // If task exists, use task name
-        if (session.task?.name) {
-          sessionName = session.task.name;
-        }
-
-        return {
-          ...session,
-          // Add session_display_name for rendering
-          session_display_name: sessionName
-        };
-      });
-
-      setRecentSessions(processedSessions);
 
       // Fetch user profile
       const { data: userProfile, error: profileError } = await supabase
@@ -325,32 +260,32 @@ export default function HubPageClient({
           {/* Recent Sessions */}
           <Card className="bg-[#1a1a2e] border-gray-800">
             <CardHeader className="pb-2">
-              <CardTitle className="text-white">Sesiones Recientes</CardTitle>
-              <CardDescription className="text-gray-400">Tus últimas 5 sesiones de enfoque</CardDescription>
+              <CardTitle className="text-white">Sesiones de Hoy</CardTitle>
             </CardHeader>
             <CardContent>
-              {recentSessions && recentSessions.length > 0 ? (
-                <ul className="space-y-2">
-                  {recentSessions.map((session) => (
-                    <li key={session.id} className="text-sm border-l-2 border-purple-600 pl-3 py-1">
-                      <div className="flex justify-between">
-                        <span className="font-medium text-white">
-                          {/* Display session name from either task or notes */}
-                          {(session.task?.name || "Sin tarea")}
-                        </span>
-                        <span className="text-gray-500 text-xs">
-                          {formatDate(session.end_time)}
-                        </span>
-                      </div>
-                      <span className="text-gray-400">
-                        {session.duration_minutes ? `${session.duration_minutes}m` : "En progreso"}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="text-sm text-gray-400">No hay sesiones recientes</p>
-              )}
+              <div className="grid grid-cols-2 gap-4 my-2">
+                <div className="bg-[#262638] p-4 rounded-lg">
+                  <div className="text-gray-400 text-sm mb-1">Sesiones</div>
+                  <div className="text-2xl font-bold text-purple-400">
+                    {recentSessions.length}
+                  </div>
+                </div>
+                <div className="bg-[#262638] p-4 rounded-lg">
+                  <div className="text-gray-400 text-sm mb-1">Tiempo Total</div>
+                  <div className="text-2xl font-bold text-purple-400">
+                    {(() => {
+                      // Calculate total minutes from today's sessions
+                      const todayMinutes = recentSessions
+                        .reduce((total, session) => total + (session.duration_minutes || 0), 0);
+                      
+                      // Format as hours and minutes
+                      const hours = Math.floor(todayMinutes / 60);
+                      const mins = todayMinutes % 60;
+                      return hours > 0 ? `${hours}h ${mins}m` : `${mins}m`;
+                    })()}
+                  </div>
+                </div>
+              </div>
             </CardContent>
           </Card>
 
@@ -381,16 +316,6 @@ export default function HubPageClient({
               </CardContent>
             </Card>
           )}
-
-          {/* Quick Start Button */}
-          <Button className="w-full bg-purple-600 hover:bg-purple-700 py-6 text-lg"
-            onClick={() => {
-              setActiveTab("timer");
-              handleTabChange("timer");
-            }}>
-            <Play className="h-5 w-5 mr-2" />
-            Iniciar Enfoque Rápido
-          </Button>
         </div>
       </div>
     </div>
