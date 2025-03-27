@@ -34,6 +34,7 @@ export async function POST(request: NextRequest) {
     }
 
     // For OAuth providers, extract identity information
+
     let username = user.user_metadata?.username;
     let avatarUrl = user.user_metadata?.avatar_url;
     

@@ -37,6 +37,43 @@ export async function GET(request: NextRequest) {
     )
   }
 
+  try {
+    // Get user info
+    const { data: { user } } = await supabase.auth.getUser()
+    
+    if (user) {
+      // Extract profile data from OAuth provider if available
+      let username = user.user_metadata?.username || '';
+      let avatarUrl = user.user_metadata?.avatar_url || '';
+      
+      if ((!username || username === '') && user.identities && user.identities.length > 0) {
+        const identity = user.identities[0];
+        const providerData = identity.identity_data;
+        
+        username = providerData.user_name || 
+                   providerData.name || 
+                   providerData.full_name || 
+                   providerData.email?.split('@')[0] || 
+                   user.email?.split('@')[0];
+                   
+        avatarUrl = avatarUrl || providerData.avatar_url;
+      }
+      
+      // Ensure profile creation for OAuth users
+      if (username) {
+        await supabase.from('profiles').upsert({
+          id: user.id,
+          username: username,
+          avatar_url: avatarUrl,
+          updated_at: new Date().toISOString()
+        }, { onConflict: 'id' });
+      }
+    }
+  } catch (error) {
+    console.error('Profile creation error:', error);
+    // Continue even if profile creation fails
+  }
+
   // If successful, redirect to hub
   return NextResponse.redirect(`${requestUrl.origin}/hub`)
 }

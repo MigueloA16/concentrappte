@@ -42,8 +42,6 @@ export async function getUserProfile() {
       // Extract avatar URL
       const avatarUrl = extractAvatarUrl(user);
       
-      console.log('Creating new profile for:', username, 'Avatar:', avatarUrl);
-      
       // Add retry logic to handle potential race conditions
       let retries = 3;
       let newProfile = null;
@@ -106,7 +104,6 @@ export async function getUserProfile() {
     // Handle existing profile with missing fields
     if (profile && (profile.best_streak === null || profile.best_streak === undefined || 
                    profile.daily_motivation === null || profile.target_hours === null)) {
-      console.log('Updating profile with missing fields');
       
       const { data: updatedProfile, error: updateError } = await supabase
         .from('profiles')
@@ -168,9 +165,6 @@ function extractUsername(user) {
     if (user.email) {
       return user.email.split('@')[0];
     }
-    
-    // Log what we received from Google to help with debugging
-    console.log('Google user metadata:', user.user_metadata);
     
     return 'Google User';
   }
