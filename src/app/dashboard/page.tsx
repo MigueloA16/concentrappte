@@ -10,20 +10,57 @@ export default async function DashboardPage() {
   const profile = await getUserProfile();
   const supabase = await createClient();
 
-  // Get recent sessions - order by end_time
+  // Get today's sessions - order by end_time
   const today = new Date();
   const todayISOString = today.toISOString().split('T')[0]; // YYYY-MM-DD format
   
   const { data: todaySessions } = await supabase
     .from("focus_sessions")
     .select(`
-    *,
-    task:task_id (id, name)
-  `)
+      *,
+      task:task_id (id, name)
+    `)
     .eq("user_id", profile?.id || '')
     .gte("end_time", todayISOString) // Filter for sessions from today
     .lt("end_time", new Date(today.getTime() + 86400000).toISOString().split('T')[0]) // Before tomorrow
-    .order("end_time", { ascending: false }); // Sufficient limit for today's sessions
+    .order("end_time", { ascending: false });
+
+  // Get total sessions count and total time 
+  const { data: totalStats } = await supabase
+    .rpc('get_user_session_stats');
+
+  // Get session stats for the last 7 and 30 days
+  const lastWeekDate = new Date(today);
+  lastWeekDate.setDate(today.getDate() - 7);
+  
+  const lastMonthDate = new Date(today);
+  lastMonthDate.setDate(today.getDate() - 30);
+  
+  const { data: periodSessions } = await supabase
+    .from("focus_sessions")
+    .select(`duration_minutes, end_time`)
+    .eq("user_id", profile?.id || '')
+    .gte("end_time", lastMonthDate.toISOString());
+
+  // Calculate stats for the periods
+  const last7Days = periodSessions?.filter(session => 
+    new Date(session.end_time || '') >= lastWeekDate
+  ).reduce((sum, session) => sum + (session.duration_minutes || 0), 0) || 0;
+  
+  const last30Days = periodSessions?.reduce((sum, session) => 
+    sum + (session.duration_minutes || 0), 0) || 0;
+
+  // Get daily activity data for heatmap
+  const startDate = new Date(today);
+  startDate.setFullYear(today.getFullYear(), 0, 1); // Start of year
+  
+  const { data: activityData } = await supabase
+    .from("daily_activity")
+    .select("*")
+    .eq("user_id", profile?.id || '')
+    .gte("date", startDate.toISOString().split('T')[0])
+    .lte("date", today.toISOString().split('T')[0])
+    .order("date", { ascending: true });
 
   // Get ALL achievements
   const { data: allAchievements } = await supabase
@@ -75,6 +112,12 @@ export default async function DashboardPage() {
         initialProfile={profile}
         initialRecentSessions={todaySessions || []}
         initialAchievements={achievementsWithProgress}
+        initialActivityData={activityData || []}
+        periodStats={{
+          last7Days,
+          last30Days
+        }}
+        totalStats={totalStats[0] || { count: 0, total_minutes: 0 }}
       />
     </Suspense>
   );

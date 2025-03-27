@@ -371,6 +371,13 @@ export interface Database {
         }
         Returns: void
       }
+      get_user_session_stats: {
+        Args: Record<string, never>
+        Returns: {
+          count: number;
+          total_minutes: number;
+        }
+      }
     }
     Enums: {
       [_ in never]: never
