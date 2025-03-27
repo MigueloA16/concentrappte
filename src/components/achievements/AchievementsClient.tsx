@@ -9,16 +9,19 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { Progress } from "@/components/ui/progress";
 import { InfoIcon, LockIcon, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { AchievementWithProgress, Profile } from "@/lib/supabase/database.types";
-import { supabase } from "@/lib/supabase/client";
-import { format } from "date-fns";
-import { es } from "date-fns/locale";
+
+// Import types directly from database.types
+import {
+  AchievementWithProgress,
+  ProfileWithLevel
+} from "@/lib/supabase/database.types";
+
+// Import icon map from a centralized location
 import { iconMap } from "@/lib/achievement-icons";
-import { Skeleton } from "@/components/ui/skeleton";
 
 interface AchievementsClientProps {
   initialAchievements: AchievementWithProgress[];
-  profile: Profile;
+  profile: ProfileWithLevel;
 }
 
 export default function AchievementsClient({
@@ -34,9 +37,6 @@ export default function AchievementsClient({
   useEffect(() => {
     if (initialAchievements.length > 0) {
       setInitialLoading(false);
-    } else {
-      // If no achievements provided, load them
-      refreshAchievements();
     }
   }, [initialAchievements]);
 
@@ -57,109 +57,112 @@ export default function AchievementsClient({
     technique: achievements.filter(a => a.category === "technique"),
   };
 
-  // Function to refresh achievements from the server
-  const refreshAchievements = async () => {
-    try {
-      setLoading(true);
-      const { data: { user } } = await supabase.auth.getUser();
-
-      if (!user) {
-        throw new Error("Usuario no autenticado");
-      }
-
-      // First, get all achievements
-      const { data: allAchievements, error: achievementsError } = await supabase
-        .from("achievements")
-        .select("*");
-
-      if (achievementsError) throw achievementsError;
-
-      // Then get user's achievements progress
-      const { data: userAchievements, error: userAchievementsError } = await supabase
-        .from("user_achievements")
-        .select(`
-          *,
-          achievement:achievement_id (id)
-        `)
-        .eq("user_id", user.id);
-
-      if (userAchievementsError) throw userAchievementsError;
-
-      // Create a map of user's achievements progress
-      const userProgressMap = new Map();
-      userAchievements.forEach(ua => {
-        userProgressMap.set(ua.achievement_id, {
-          progress: ua.progress,
-          unlocked: ua.unlocked,
-          unlocked_at: ua.unlocked_at
-        });
-      });
-
-      // Combine all achievements with user progress
-      const formattedAchievements = allAchievements.map(achievement => ({
-        ...achievement,
-        progress: userProgressMap.get(achievement.id)?.progress || 0,
-        unlocked: userProgressMap.get(achievement.id)?.unlocked || false,
-        unlocked_at: userProgressMap.get(achievement.id)?.unlocked_at || null
-      }));
-
-      setAchievements(formattedAchievements);
-    } catch (error) {
-      console.error("Error refreshing achievements:", error);
-    } finally {
-      setLoading(false);
-      setInitialLoading(false);
-    }
-  };
-
-  // Set up real-time subscription for achievement updates
-  useEffect(() => {
-    const achievementsChannel = supabase
-      .channel('achievement-updates')
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'user_achievements',
-          filter: `user_id=eq.${profile?.id}`
-        },
-        () => {
-          refreshAchievements();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(achievementsChannel);
-    };
-  }, [profile?.id]);
-
-  // Render skeleton screens while loading
-  if (initialLoading) {
-    return (
-      <div className="container mx-auto py-8 max-w-7xl">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-white mb-2">Logros</h1>
-          <p className="text-gray-400">Desbloquea logros a medida que utilizas la aplicación y mejoras tu productividad</p>
-
-          <div className="mt-4 flex flex-col md:flex-row gap-4">
-            <Skeleton className="bg-[#1a1a2e] h-32 flex-1" />
-            <Skeleton className="bg-[#1a1a2e] h-32 flex-1" />
-            <Skeleton className="bg-[#1a1a2e] h-32 flex-1" />
-          </div>
-        </div>
-
-        <Skeleton className="bg-[#1a1a2e] h-10 w-80 mb-6" />
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {[...Array(6)].map((_, i) => (
-            <Skeleton key={i} className="bg-[#1a1a2e] h-44" />
-          ))}
-        </div>
-      </div>
+  // Render achievement card
+  const renderAchievementCard = (achievement: AchievementWithProgress) => {
+    const IconComponent = iconMap[achievement.icon_name as keyof typeof iconMap] || iconMap.Trophy;
+    const progressPercentage = Math.min(
+      100,
+      Math.round((achievement.progress / achievement.requirement_value) * 100)
     );
-  }
+
+    return (
+      <Card
+        key={achievement.id}
+        className={cn(
+          "bg-[#1a1a2e] border-gray-800 transition-all duration-300",
+          achievement.unlocked ? "border-purple-600/40" : "opacity-75"
+        )}
+      >
+        <CardHeader className="pb-2 relative">
+          <div className="flex justify-between items-start">
+            <div className="flex gap-3 items-center">
+              <div className={cn(
+                "flex items-center justify-center rounded-full p-3",
+                achievement.unlocked
+                  ? "bg-purple-900/40 text-purple-300"
+                  : "bg-gray-800/50 text-gray-400"
+              )}>
+                <IconComponent className="h-6 w-6" />
+              </div>
+              <div>
+                <CardTitle className={cn(
+                  "text-lg",
+                  achievement.unlocked ? "text-white" : "text-gray-400"
+                )}>
+                  {achievement.name}
+                </CardTitle>
+                <CardDescription className="text-gray-400">
+                  {achievement.description}
+                </CardDescription>
+              </div>
+            </div>
+
+            {!achievement.unlocked && (
+              <div className="text-gray-600">
+                <LockIcon className="h-5 w-5" />
+              </div>
+            )}
+          </div>
+
+          {achievement.unlocked && (
+            <Badge
+              className="absolute top-3 right-6 bg-purple-600 hover:bg-purple-700"
+            >
+              Desbloqueado
+            </Badge>
+          )}
+        </CardHeader>
+
+        <CardContent>
+          <div className="space-y-2">
+            <div className="flex justify-between items-center">
+              <div className="flex items-center gap-2">
+                <span className={cn(
+                  "text-sm font-medium",
+                  achievement.unlocked ? "text-purple-400" : "text-gray-500"
+                )}>
+                  Progreso: {achievement.progress}/{achievement.requirement_value}
+                </span>
+
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <InfoIcon className="h-3.5 w-3.5 text-gray-500 cursor-help" />
+                    </TooltipTrigger>
+                    <TooltipContent className="bg-[#262638] border-gray-700 text-white">
+                      <p>{achievement.description}</p>
+                      {achievement.unlocked && achievement.unlocked_at && (
+                        <p className="text-xs text-gray-400 mt-1">
+                          Desbloqueado el {new Date(achievement.unlocked_at).toLocaleDateString()}
+                        </p>
+                      )}
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </div>
+              <span className="text-xs text-gray-500">{progressPercentage}%</span>
+            </div>
+
+            <Progress
+              value={progressPercentage}
+              className={cn(
+                "h-2",
+                achievement.unlocked
+                  ? "bg-gray-700"
+                  : "bg-gray-800"
+              )}
+            />
+
+            {achievement.unlocked && achievement.unlocked_at && (
+              <p className="text-xs text-gray-500 mt-1">
+                Desbloqueado el {new Date(achievement.unlocked_at).toLocaleDateString()}
+              </p>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+    );
+  };
 
   return (
     <div className="container mx-auto py-8 max-w-7xl">
@@ -211,7 +214,7 @@ export default function AchievementsClient({
         </div>
       </div>
 
-      <Tabs defaultValue="all" value={activeTab} onValueChange={setActiveTab}>
+      <Tabs defaultValue={activeTab} value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="bg-[#1a1a2e] border border-gray-800 mb-6">
           <TabsTrigger value="all">Todos</TabsTrigger>
           <TabsTrigger value="daily">Diarios</TabsTrigger>
@@ -220,12 +223,12 @@ export default function AchievementsClient({
           <TabsTrigger value="technique">Técnicas</TabsTrigger>
         </TabsList>
 
-        {loading &&
+        {loading && (
           <div className="flex justify-center items-center my-8">
             <Loader2 className="h-8 w-8 text-purple-400 animate-spin mr-2" />
             <span className="text-gray-300">Actualizando logros...</span>
           </div>
-        }
+        )}
 
         <TabsContent value="all" className="space-y-6">
           {Object.entries(achievementsByCategory).map(([category, categoryAchievements]) => (
@@ -238,183 +241,27 @@ export default function AchievementsClient({
                   {category === "technique" && "Logros de Técnica"}
                 </h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {categoryAchievements.map(achievement => (
-                    <AchievementCard key={achievement.id} achievement={achievement} />
-                  ))}
+                  {categoryAchievements.map(renderAchievementCard)}
                 </div>
               </div>
             )
           ))}
         </TabsContent>
 
-        <TabsContent value="daily" className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredAchievements.length > 0 ? (
-              filteredAchievements.map(achievement => (
-                <AchievementCard key={achievement.id} achievement={achievement} />
-              ))
-            ) : (
-              <div className="col-span-3 text-center py-8 text-gray-400">
-                No hay logros en esta categoría
-              </div>
-            )}
-          </div>
-        </TabsContent>
-
-        <TabsContent value="streak" className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredAchievements.length > 0 ? (
-              filteredAchievements.map(achievement => (
-                <AchievementCard key={achievement.id} achievement={achievement} />
-              ))
-            ) : (
-              <div className="col-span-3 text-center py-8 text-gray-400">
-                No hay logros en esta categoría
-              </div>
-            )}
-          </div>
-        </TabsContent>
-
-        <TabsContent value="total" className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredAchievements.length > 0 ? (
-              filteredAchievements.map(achievement => (
-                <AchievementCard key={achievement.id} achievement={achievement} />
-              ))
-            ) : (
-              <div className="col-span-3 text-center py-8 text-gray-400">
-                No hay logros en esta categoría
-              </div>
-            )}
-          </div>
-        </TabsContent>
-
-        <TabsContent value="technique" className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredAchievements.length > 0 ? (
-              filteredAchievements.map(achievement => (
-                <AchievementCard key={achievement.id} achievement={achievement} />
-              ))
-            ) : (
-              <div className="col-span-3 text-center py-8 text-gray-400">
-                No hay logros en esta categoría
-              </div>
-            )}
-          </div>
-        </TabsContent>
+        {["daily", "streak", "total", "technique"].map(tab => (
+          <TabsContent key={tab} value={tab} className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {filteredAchievements.length > 0 ? (
+                filteredAchievements.map(renderAchievementCard)
+              ) : (
+                <div className="col-span-3 text-center py-8 text-gray-400">
+                  No hay logros en esta categoría
+                </div>
+              )}
+            </div>
+          </TabsContent>
+        ))}
       </Tabs>
     </div>
-  );
-}
-
-// Component for individual achievement cards
-function AchievementCard({ achievement }: { achievement: AchievementWithProgress }) {
-  // Get the appropriate icon based on the icon name
-  const IconComponent = iconMap[achievement.icon_name as keyof typeof iconMap] || iconMap.Trophy;
-
-  // Format unlocked date if available
-  const formattedDate = achievement.unlocked_at
-    ? format(new Date(achievement.unlocked_at), 'dd/MM/yyyy', { locale: es })
-    : null;
-
-  // Calculate progress percentage
-  const progressPercentage = Math.min(
-    100,
-    Math.round((achievement.progress / achievement.requirement_value) * 100)
-  );
-
-  return (
-    <Card className={cn(
-      "bg-[#1a1a2e] border-gray-800 transition-all duration-300",
-      achievement.unlocked ? "border-purple-600/40" : "opacity-75"
-    )}>
-      <CardHeader className="pb-2 relative">
-        <div className="flex justify-between items-start">
-          <div className="flex gap-3 items-center">
-            <div className={cn(
-              "flex items-center justify-center rounded-full p-3",
-              achievement.unlocked
-                ? "bg-purple-900/40 text-purple-300"
-                : "bg-gray-800/50 text-gray-400"
-            )}>
-              <IconComponent className="h-6 w-6" />
-            </div>
-            <div>
-              <CardTitle className={cn(
-                "text-lg",
-                achievement.unlocked ? "text-white" : "text-gray-400"
-              )}>
-                {achievement.name}
-              </CardTitle>
-              <CardDescription className="text-gray-400">
-                {achievement.description}
-              </CardDescription>
-            </div>
-          </div>
-
-          {!achievement.unlocked && (
-            <div className="text-gray-600">
-              <LockIcon className="h-5 w-5" />
-            </div>
-          )}
-        </div>
-
-        {achievement.unlocked && (
-          <Badge
-            className="absolute top-3 right-6 bg-purple-600 hover:bg-purple-700"
-          >
-            Desbloqueado
-          </Badge>
-        )}
-      </CardHeader>
-
-      <CardContent>
-        <div className="space-y-2">
-          <div className="flex justify-between items-center">
-            <div className="flex items-center gap-2">
-              <span className={cn(
-                "text-sm font-medium",
-                achievement.unlocked ? "text-purple-400" : "text-gray-500"
-              )}>
-                Progreso: {achievement.progress}/{achievement.requirement_value}
-              </span>
-
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <InfoIcon className="h-3.5 w-3.5 text-gray-500 cursor-help" />
-                  </TooltipTrigger>
-                  <TooltipContent className="bg-[#262638] border-gray-700 text-white">
-                    <p>{achievement.description}</p>
-                    {formattedDate && (
-                      <p className="text-xs text-gray-400 mt-1">
-                        Desbloqueado el {formattedDate}
-                      </p>
-                    )}
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            </div>
-            <span className="text-xs text-gray-500">{progressPercentage}%</span>
-          </div>
-
-          <Progress
-            value={progressPercentage}
-            className={cn(
-              "h-2",
-              achievement.unlocked
-                ? "bg-gray-700"
-                : "bg-gray-800"
-            )}
-          />
-
-          {achievement.unlocked && formattedDate && (
-            <p className="text-xs text-gray-500 mt-1">
-              Desbloqueado el {formattedDate}
-            </p>
-          )}
-        </div>
-      </CardContent>
-    </Card>
   );
 }

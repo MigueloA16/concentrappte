@@ -1,30 +1,29 @@
+// src/components/hub/HubPageClient.tsx
 "use client";
 
-import { useState, useEffect } from "react";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
+import { useSearchParams } from "next/navigation";
+import { supabase } from "@/lib/supabase/client";
+
+// Icons
 import {
   Clock,
   Settings,
   LayoutGrid,
   Flame
 } from "lucide-react";
+
+// UI Components
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+
+// Custom Components
 import TimerSettings from "@/components/timer/TimerSettings";
 import FocusTimer from "@/components/timer/FocusTimer";
 import TaskManager from "@/components/timer/TaskManager";
-import { supabase } from "@/lib/supabase/client";
-import { useSearchParams } from "next/navigation";
-import { Task, TimerSetting } from "@/lib/supabase/database.types";
 
-type FocusSession = {
-  id: string;
-  duration_minutes: number;
-  end_time: string;
-  notes?: string;
-  task?: {
-    name: string;
-  };
-};
+// Types
+import { Task, TimerSetting, FocusSession } from "@/lib/supabase/database.types";
 
 type Profile = {
   id: string;
@@ -33,6 +32,7 @@ type Profile = {
   streak_days: number;
 };
 
+// Component Props Interface
 interface HubPageClientProps {
   initialTimerSettings: TimerSetting;
   initialAllTasks: Task[];
@@ -46,9 +46,11 @@ export default function HubPageClient({
   initialTodaySessions,
   initialProfile
 }: HubPageClientProps) {
+  // Search Params
   const searchParams = useSearchParams();
   const tabParam = searchParams.get('tab');
 
+  // State Management
   const [activeTab, setActiveTab] = useState(tabParam || "timer");
   const [timerSettings, setTimerSettings] = useState<TimerSetting | null>(initialTimerSettings);
   const [allTasks, setAllTasks] = useState<Task[]>(initialAllTasks || []);
@@ -56,24 +58,28 @@ export default function HubPageClient({
   const [profile, setProfile] = useState<Profile>(initialProfile);
   const [loading, setLoading] = useState(false);
 
-  // Handle tab changes via URL
+  // Memoized Calculations
+  const todaysTotalMinutes = useMemo(() => {
+    return todaySessions.reduce((total, session) => total + (session.duration_minutes || 0), 0);
+  }, [todaySessions]);
+
+  // Utility Callbacks
+  const formatMinutes = useCallback((minutes: number) => {
+    const hours = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+    return hours > 0 ? `${hours}h ${mins}m` : `${mins}m`;
+  }, []);
+
+  // Effects
   useEffect(() => {
+    // Handle tab changes via URL
     if (tabParam && ["timer", "settings", "tasks"].includes(tabParam)) {
       setActiveTab(tabParam);
     }
   }, [tabParam]);
 
-  // Update URL when tabs change
-  const handleTabChange = (tab: string) => {
-    setActiveTab(tab);
-    // Update URL without navigation
-    const url = new URL(window.location.href);
-    url.searchParams.set('tab', tab);
-    window.history.pushState({}, '', url.toString());
-  };
-
-  // Refresh data function for when settings or tasks are changed
-  const refreshData = async () => {
+  // Data Refresh Function
+  const refreshData = useCallback(async () => {
     try {
       setLoading(true);
 
@@ -141,35 +147,30 @@ export default function HubPageClient({
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  // Handler for timer settings changes
-  const handleTimerSettingsChanged = () => {
+  // Event Handlers
+  const handleTabChange = useCallback((tab: string) => {
+    setActiveTab(tab);
+    // Update URL without navigation
+    const url = new URL(window.location.href);
+    url.searchParams.set('tab', tab);
+    window.history.pushState({}, '', url.toString());
+  }, []);
+
+  const handleTimerSettingsChanged = useCallback(() => {
     refreshData();
-  };
+  }, [refreshData]);
 
-  // Handler for tasks changes
-  const handleTasksChanged = () => {
+  const handleTasksChanged = useCallback(() => {
     refreshData();
-  };
+  }, [refreshData]);
 
-  // Handle session completion
-  const handleSessionComplete = () => {
+  const handleSessionComplete = useCallback(() => {
     refreshData();
-  };
+  }, [refreshData]);
 
-  // Format minutes to hours and minutes
-  const formatMinutes = (minutes: number) => {
-    const hours = Math.floor(minutes / 60);
-    const mins = minutes % 60;
-    return hours > 0 ? `${hours}h ${mins}m` : `${mins}m`;
-  };
-
-  // Calculate today's total minutes
-  const calculateTodaysTotalMinutes = () => {
-    return todaySessions.reduce((total, session) => total + (session.duration_minutes || 0), 0);
-  };
-
+  // Render
   return (
     <div className="container mx-auto py-8 px-4 max-w-7xl">
       <h1 className="text-3xl font-bold mb-8 text-white">Centro de Enfoque</h1>
@@ -178,7 +179,12 @@ export default function HubPageClient({
         {/* Main Content Area */}
         <div className="lg:col-span-8 space-y-8">
           {/* Timer Tabs Component */}
-          <Tabs defaultValue={activeTab} value={activeTab} onValueChange={handleTabChange} className="w-full">
+          <Tabs 
+            defaultValue={activeTab} 
+            value={activeTab} 
+            onValueChange={handleTabChange} 
+            className="w-full"
+          >
             <TabsList className="bg-[#1a1a2e] border border-gray-800 w-full h-auto">
               <TabsTrigger value="timer" className="flex-1 flex-col sm:flex-row h-auto py-2 px-1">
                 <Clock className="h-4 w-4 mb-1 sm:mb-0 sm:mr-2" />
@@ -297,7 +303,7 @@ export default function HubPageClient({
                   <div className="bg-[#262638] p-3 rounded-lg text-center">
                     <div className="text-gray-400 text-xs mb-1">Tiempo Total</div>
                     <div className="text-xl font-bold text-purple-400">
-                      {formatMinutes(calculateTodaysTotalMinutes())}
+                      {formatMinutes(todaysTotalMinutes)}
                     </div>
                   </div>
                 </div>

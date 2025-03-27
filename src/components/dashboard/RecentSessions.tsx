@@ -1,7 +1,10 @@
 // src/components/dashboard/RecentSessions.tsx
-import { useState, useEffect } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
+import { format, isToday, isYesterday } from "date-fns";
+import { es } from "date-fns/locale";
+import { toast } from "sonner";
+
+// Icons
 import {
   Clock,
   Tag,
@@ -13,6 +16,12 @@ import {
   Trash,
   ChevronLeft
 } from "lucide-react";
+
+// UI Components
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -20,68 +29,56 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger
 } from "@/components/ui/dropdown-menu";
-import { Input } from "@/components/ui/input";
-import { Skeleton } from "@/components/ui/skeleton";
-import { format, isToday, isYesterday } from "date-fns";
-import { es } from "date-fns/locale";
-import Link from "next/link";
+
+// Supabase and Types
 import { supabase } from "@/lib/supabase/client";
 import { FocusSession } from "@/lib/supabase/database.types";
-import { toast } from "sonner";
 
+// Constants
+const SESSIONS_PER_PAGE = 5;
+
+// Component Props Interface
 interface RecentSessionsProps {
   sessions: FocusSession[];
   isLoading?: boolean;
   onSessionUpdated?: () => void;
 }
 
-const SESSIONS_PER_PAGE = 5;
-
 export default function RecentSessions({
   sessions = [],
   isLoading = false,
   onSessionUpdated
 }: RecentSessionsProps) {
+  // State Management
   const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
   const [editedSessionName, setEditedSessionName] = useState("");
   const [actionLoading, setActionLoading] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
-  const [totalSessions, setTotalSessions] = useState(0);
-  const [paginatedSessions, setPaginatedSessions] = useState<FocusSession[]>([]);
 
-  // Set up pagination whenever sessions change
-  useEffect(() => {
-    if (sessions && sessions.length > 0) {
-      setTotalSessions(sessions.length);
-      const start = (currentPage - 1) * SESSIONS_PER_PAGE;
-      const end = start + SESSIONS_PER_PAGE;
-      setPaginatedSessions(sessions.slice(start, end));
-    } else {
-      setPaginatedSessions([]);
-      setTotalSessions(0);
-    }
+  // Memoized Pagination Logic
+  const sessionPagination = useMemo(() => {
+    const totalSessions = sessions.length;
+    const totalPages = Math.ceil(totalSessions / SESSIONS_PER_PAGE);
+    const start = (currentPage - 1) * SESSIONS_PER_PAGE;
+    const end = start + SESSIONS_PER_PAGE;
+    const paginatedSessions = sessions.slice(start, end);
+
+    return {
+      totalSessions,
+      totalPages,
+      paginatedSessions
+    };
   }, [sessions, currentPage]);
 
-  // Calculate total pages
-  const totalPages = Math.ceil(totalSessions / SESSIONS_PER_PAGE);
-
-  // Handle page changes
-  const goToPage = (page: number) => {
-    if (page >= 1 && page <= totalPages) {
-      setCurrentPage(page);
-    }
-  };
-
-  // Format duration from minutes
-  const formatDuration = (minutes: number | undefined | null) => {
+  // Utility Functions
+  const formatDuration = useCallback((minutes: number | undefined | null) => {
     if (!minutes) return "0m";
     const hours = Math.floor(minutes / 60);
     const mins = minutes % 60;
     return hours > 0 ? `${hours}h ${mins}m` : `${mins}m`;
-  };
+  }, []);
 
-  // Format date in a readable way
-  const formatDate = (dateString: string) => {
+  const formatDate = useCallback((dateString: string) => {
     const date = new Date(dateString);
 
     if (isToday(date)) {
@@ -91,22 +88,28 @@ export default function RecentSessions({
     } else {
       return format(date, 'dd MMM, HH:mm', { locale: es });
     }
-  };
+  }, []);
 
-  // Start editing a session name
-  const startEditing = (session: FocusSession) => {
+  // Page Navigation
+  const goToPage = useCallback((page: number) => {
+    if (page >= 1 && page <= sessionPagination.totalPages) {
+      setCurrentPage(page);
+    }
+  }, [sessionPagination.totalPages]);
+
+  // Session Editing Methods
+  const startEditing = useCallback((session: FocusSession) => {
     setEditingSessionId(session.id);
     setEditedSessionName(session.session_name || '');
-  };
+  }, []);
 
-  // Cancel editing
-  const cancelEditing = () => {
+  const cancelEditing = useCallback(() => {
     setEditingSessionId(null);
     setEditedSessionName('');
-  };
+  }, []);
 
-  // Save edited session name
-  const saveSessionName = async (sessionId: string) => {
+  // Save Edited Session Name
+  const saveSessionName = useCallback(async (sessionId: string) => {
     if (!editedSessionName.trim()) {
       toast.warning('El nombre de la sesión no puede estar vacío');
       return;
@@ -136,10 +139,10 @@ export default function RecentSessions({
     } finally {
       setActionLoading(false);
     }
-  };
+  }, [editedSessionName, onSessionUpdated]);
 
-  // Delete a session
-  const deleteSession = async (sessionId: string) => {
+  // Delete Session
+  const deleteSession = useCallback(async (sessionId: string) => {
     try {
       setActionLoading(true);
 
@@ -180,9 +183,9 @@ export default function RecentSessions({
     } finally {
       setActionLoading(false);
     }
-  };
+  }, [onSessionUpdated]);
 
-  // Loading skeleton
+  // Render Loading State
   if (isLoading) {
     return (
       <Card className="bg-[#1a1a2e] border-gray-800 flex-1 flex flex-col">
@@ -216,17 +219,16 @@ export default function RecentSessions({
               Sesiones Recientes
             </CardTitle>
             <CardDescription className="text-gray-400 my-2">
-              Mostrando {paginatedSessions.length} de {totalSessions} sesiones
+              Mostrando {sessionPagination.paginatedSessions.length} de {sessionPagination.totalSessions} sesiones
             </CardDescription>
           </div>
         </div>
       </CardHeader>
       <CardContent>
-        {paginatedSessions.length > 0 ? (
+        {sessionPagination.paginatedSessions.length > 0 ? (
           <div className="space-y-3">
-            {paginatedSessions.map((session) => (
+            {sessionPagination.paginatedSessions.map((session) => (
               <div key={session.id} className="p-3 rounded-md bg-[#262638]">
-                {/* Session details content */}
                 <div className="flex justify-between items-start">
                   <div className="space-y-1">
                     {/* Session name - editable */}
@@ -329,7 +331,7 @@ export default function RecentSessions({
         )}
 
         {/* Pagination controls */}
-        {totalPages > 1 && (
+        {sessionPagination.totalPages > 1 && (
           <div className="flex justify-center items-center space-x-2 mt-4">
             <Button
               variant="outline"
@@ -342,14 +344,14 @@ export default function RecentSessions({
             </Button>
 
             <span className="text-sm text-gray-400">
-              Página {currentPage} de {totalPages}
+              Página {currentPage} de {sessionPagination.totalPages}
             </span>
 
             <Button
               variant="outline"
               size="icon"
               onClick={() => goToPage(currentPage + 1)}
-              disabled={currentPage >= totalPages || actionLoading}
+              disabled={currentPage >= sessionPagination.totalPages || actionLoading}
               className="h-8 w-8 bg-transparent border-gray-700 text-gray-400"
             >
               <ChevronRight className="h-4 w-4" />

@@ -1,15 +1,11 @@
 // src/components/dashboard/DashboardClient.tsx
 "use client";
 
-import { useState, useEffect } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
+import { toast } from "sonner";
 import { supabase } from "@/lib/supabase/client";
-import RecentAchievements from "@/components/achievements/RecentAchievements";
-import RecentSessions from "@/components/dashboard/RecentSessions"; // Import the new component
-import { ActivityHeatmap } from "@/components/dashboard/ActivityHeatmap";
+
+// Icons
 import {
   Trophy,
   Edit2,
@@ -21,25 +17,37 @@ import {
   Award,
   Loader2
 } from "lucide-react";
+
+// UI Components
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+
+// Custom Components
+import RecentAchievements from "@/components/achievements/RecentAchievements";
+import RecentSessions from "@/components/dashboard/RecentSessions";
+import { ActivityHeatmap } from "@/components/dashboard/ActivityHeatmap";
+
+// Types
 import {
   ProfileWithLevel,
   DailyActivity,
   AchievementWithProgress,
   FocusSession
 } from "@/lib/supabase/database.types";
-import { toast } from "sonner";
 
-// Define level thresholds in minutes
+// Constants
 const LEVELS = [
   { name: "Bronce", threshold: 0, color: "from-amber-700 to-amber-500", textColor: "text-amber-400" },
-  { name: "Plata", threshold: 3000, color: "from-gray-400 to-gray-300", textColor: "text-gray-300" },      // 50 hours
-  { name: "Oro", threshold: 6000, color: "from-yellow-500 to-yellow-300", textColor: "text-yellow-400" },  // 100 hours
-  { name: "Platino", threshold: 12000, color: "from-cyan-600 to-cyan-400", textColor: "text-cyan-400" },   // 200 hours
-  { name: "Diamante", threshold: 24000, color: "from-purple-600 to-blue-400", textColor: "text-blue-400" } // 400 hours
+  { name: "Plata", threshold: 3000, color: "from-gray-400 to-gray-300", textColor: "text-gray-300" },
+  { name: "Oro", threshold: 6000, color: "from-yellow-500 to-yellow-300", textColor: "text-yellow-400" },
+  { name: "Platino", threshold: 12000, color: "from-cyan-600 to-cyan-400", textColor: "text-cyan-400" },
+  { name: "Diamante", threshold: 24000, color: "from-purple-600 to-blue-400", textColor: "text-blue-400" }
 ];
 
-// Get user level based on total minutes
+// Utility Functions
 const getUserLevel = (totalMinutes: number) => {
   let level = LEVELS[0];
   for (let i = 1; i < LEVELS.length; i++) {
@@ -52,13 +60,12 @@ const getUserLevel = (totalMinutes: number) => {
   return level;
 };
 
-// Get progress to next level
 const getProgressToNextLevel = (totalMinutes: number) => {
   const currentLevel = getUserLevel(totalMinutes);
   const currentLevelIndex = LEVELS.findIndex(level => level.name === currentLevel.name);
   const isMaxLevel = currentLevelIndex === LEVELS.length - 1;
 
-  if (isMaxLevel) return 100; // Max level reached
+  if (isMaxLevel) return 100;
 
   const nextLevel = LEVELS[currentLevelIndex + 1];
   const progressInCurrentLevel = totalMinutes - currentLevel.threshold;
@@ -67,7 +74,6 @@ const getProgressToNextLevel = (totalMinutes: number) => {
   return Math.min(Math.round((progressInCurrentLevel / currentLevelRange) * 100), 99);
 };
 
-// Get next level info
 const getNextLevelInfo = (totalMinutes: number) => {
   const currentLevel = getUserLevel(totalMinutes);
   const currentLevelIndex = LEVELS.findIndex(level => level.name === currentLevel.name);
@@ -81,6 +87,7 @@ const getNextLevelInfo = (totalMinutes: number) => {
   return { name: nextLevel.name, minutesNeeded };
 };
 
+// Component Props Interface
 interface DashboardClientProps {
   initialProfile: ProfileWithLevel;
   initialTodaySessions: FocusSession[];
@@ -104,6 +111,7 @@ export default function DashboardClient({
   periodStats = { last7Days: 0, last30Days: 0 },
   totalStats = { count: 0, total_minutes: 0 }
 }: DashboardClientProps) {
+  // Initial State Setup
   const [profile, setProfile] = useState<ProfileWithLevel>({
     ...initialProfile,
     daily_motivation: initialProfile.daily_motivation || "Focus on the process, not just the outcome",
@@ -114,22 +122,52 @@ export default function DashboardClient({
   const [todaySessions, setTodaySessions] = useState<FocusSession[]>(initialTodaySessions || []);
   const [achievements, setAchievements] = useState<AchievementWithProgress[]>(initialAchievements);
   const [activityData, setActivityData] = useState<DailyActivity[]>(initialActivityData);
+
+  // Editing States
   const [editingMotivation, setEditingMotivation] = useState(false);
   const [motivationText, setMotivationText] = useState(profile.daily_motivation || "");
   const [editingTarget, setEditingTarget] = useState(false);
   const [targetHours, setTargetHours] = useState(profile.target_hours || 100);
+
+  // Loading States
   const [loading, setLoading] = useState(false);
   const [isStatsLoading, setIsStatsLoading] = useState(initialActivityData.length === 0);
   const [isAchievementsLoading, setIsAchievementsLoading] = useState(initialAchievements.length === 0);
   const [isSessionsLoading, setIsSessionsLoading] = useState(initialTodaySessions.length === 0);
 
-  // Get current level info
-  const currentLevel = getUserLevel(profile.total_focus_time || 0);
-  const levelProgress = getProgressToNextLevel(profile.total_focus_time || 0);
-  const nextLevelInfo = getNextLevelInfo(profile.total_focus_time || 0);
+  // Memoized Calculations
+  const levelInfo = useMemo(() => {
+    const currentLevel = getUserLevel(profile.total_focus_time || 0);
+    const levelProgress = getProgressToNextLevel(profile.total_focus_time || 0);
+    const nextLevelInfo = getNextLevelInfo(profile.total_focus_time || 0);
 
-  // Set initial loading states based on provided data
+    return {
+      currentLevel,
+      levelProgress,
+      nextLevelInfo
+    };
+  }, [profile.total_focus_time]);
+
+  // Utility Callbacks
+  const formatMinutes = useCallback((minutes: number) => {
+    const hours = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+    return `${hours}h:${mins}m`;
+  }, []);
+
+  const calculateTodaysTotalMinutes = useCallback(() => {
+    return todaySessions.reduce((total, session) => total + (session.duration_minutes || 0), 0);
+  }, [todaySessions]);
+
+  const targetHoursProgress = useCallback(() => {
+    const targetMinutes = (profile.target_hours || 100) * 60;
+    const percentage = Math.min(Math.round((profile.total_focus_time / targetMinutes) * 100), 100);
+    return percentage;
+  }, [profile.target_hours, profile.total_focus_time]);
+
+  // Effects
   useEffect(() => {
+    // Initial loading state management
     if (initialActivityData.length > 0) {
       setIsStatsLoading(false);
     }
@@ -143,23 +181,21 @@ export default function DashboardClient({
     }
   }, [initialActivityData, initialAchievements, initialTodaySessions]);
 
-  // Save motivation text
-  const saveMotivation = async () => {
+  // Save Motivation Callback
+  const saveMotivation = useCallback(async () => {
     try {
       setLoading(true);
 
-      // Call the RPC to update the motivation
       const { error } = await supabase.rpc("update_daily_motivation", {
         motivation: motivationText
       });
 
       if (error) throw error;
 
-      // Update local state
-      setProfile({
-        ...profile,
+      setProfile(prev => ({
+        ...prev,
         daily_motivation: motivationText
-      });
+      }));
 
       setEditingMotivation(false);
       toast.success("Motivación actualizada");
@@ -169,10 +205,10 @@ export default function DashboardClient({
     } finally {
       setLoading(false);
     }
-  };
+  }, [motivationText]);
 
-  // Save target hours
-  const saveTargetHours = async () => {
+  // Save Target Hours Callback
+  const saveTargetHours = useCallback(async () => {
     try {
       setLoading(true);
 
@@ -182,18 +218,14 @@ export default function DashboardClient({
         return;
       }
 
-      // Call the RPC to update the target hours
-      const { error } = await supabase.rpc("update_target_hours", {
-        hours
-      });
+      const { error } = await supabase.rpc("update_target_hours", { hours });
 
       if (error) throw error;
 
-      // Update local state
-      setProfile({
-        ...profile,
+      setProfile(prev => ({
+        ...prev,
         target_hours: hours
-      });
+      }));
 
       setEditingTarget(false);
       toast.success("Meta de horas actualizada");
@@ -203,29 +235,10 @@ export default function DashboardClient({
     } finally {
       setLoading(false);
     }
-  };
+  }, [targetHours]);
 
-  // Format minutes to hours and minutes
-  const formatMinutes = (minutes: number) => {
-    const hours = Math.floor(minutes / 60);
-    const mins = minutes % 60;
-    return `${hours}h:${mins}m`;
-  };
-
-  // Calculate target hours progress
-  const targetHoursProgress = () => {
-    const targetMinutes = (profile.target_hours || 100) * 60;
-    const percentage = Math.min(Math.round((profile.total_focus_time / targetMinutes) * 100), 100);
-    return percentage;
-  };
-
-  // Calculate today's total minutes from session data
-  const calculateTodaysTotalMinutes = () => {
-    return todaySessions.reduce((total, session) => total + (session.duration_minutes || 0), 0);
-  };
-
-  // Refresh sessions when updated
-  const handleSessionsUpdated = async () => {
+  // Refresh Sessions Callback
+  const handleSessionsUpdated = useCallback(async () => {
     try {
       setIsSessionsLoading(true);
 
@@ -252,7 +265,7 @@ export default function DashboardClient({
     } finally {
       setIsSessionsLoading(false);
     }
-  };
+  }, [profile?.id]);
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
@@ -281,18 +294,17 @@ export default function DashboardClient({
               ) : (
                 <>
                   <div className="flex items-center gap-2">
-                    {/* Award icon in a circle */}
                     <div className="w-12 h-12 rounded-full flex items-center justify-center bg-[#262638] border-2 border-purple-400">
                       <Award className="h-6 w-6 text-purple-400" />
                     </div>
                     <div>
                       <div className="flex items-center gap-2">
-                        <span className="text-purple-400 font-bold">{currentLevel.name}</span>
-                        <span className="text-white">Nivel {LEVELS.findIndex(l => l.name === currentLevel.name) + 1}</span>
+                        <span className="text-purple-400 font-bold">{levelInfo.currentLevel.name}</span>
+                        <span className="text-white">Nivel {LEVELS.findIndex(l => l.name === levelInfo.currentLevel.name) + 1}</span>
                       </div>
                       <CardDescription className="text-gray-400">
-                        {nextLevelInfo.name ?
-                          `${formatMinutes(nextLevelInfo.minutesNeeded)} más para alcanzar el nivel ${nextLevelInfo.name}` :
+                        {levelInfo.nextLevelInfo.name ?
+                          `${formatMinutes(levelInfo.nextLevelInfo.minutesNeeded)} más para alcanzar el nivel ${levelInfo.nextLevelInfo.name}` :
                           "¡Has alcanzado el nivel máximo!"
                         }
                       </CardDescription>
@@ -308,13 +320,13 @@ export default function DashboardClient({
             <div className="space-y-2 mt-2">
               <div className="flex justify-between items-center">
                 <span className="text-sm text-gray-400">Progreso</span>
-                <span className="text-sm text-gray-400">{levelProgress}%</span>
+                <span className="text-sm text-gray-400">{levelInfo.levelProgress}%</span>
               </div>
               {isStatsLoading ? (
                 <Skeleton className="h-2 w-full" />
               ) : (
                 <Progress
-                  value={levelProgress}
+                  value={levelInfo.levelProgress}
                   className="h-2 bg-gray-700"
                 />
               )}
