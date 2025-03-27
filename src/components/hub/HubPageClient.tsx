@@ -2,7 +2,12 @@
 
 import { useState, useEffect } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Clock, Settings, LayoutGrid } from "lucide-react";
+import {
+  Clock,
+  Settings,
+  LayoutGrid,
+  Flame
+} from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import TimerSettings from "@/components/timer/TimerSettings";
 import FocusTimer from "@/components/timer/FocusTimer";
@@ -167,7 +172,7 @@ export default function HubPageClient({
   };
 
   return (
-    <div className="container mx-auto py-8 max-w-7xl">
+    <div className="container mx-auto py-8 px-4 max-w-7xl">
       <h1 className="text-3xl font-bold mb-8 text-white">Centro de Enfoque</h1>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
@@ -175,18 +180,18 @@ export default function HubPageClient({
         <div className="lg:col-span-8 space-y-8">
           {/* Timer Tabs Component */}
           <Tabs defaultValue={activeTab} value={activeTab} onValueChange={handleTabChange} className="w-full">
-            <TabsList className="bg-[#1a1a2e] border border-gray-800 w-full">
-              <TabsTrigger value="timer" className="flex-1">
-                <Clock className="h-4 w-4 mr-2" />
-                Temporizador
+            <TabsList className="bg-[#1a1a2e] border border-gray-800 w-full h-auto">
+              <TabsTrigger value="timer" className="flex-1 flex-col sm:flex-row h-auto py-2 px-1">
+                <Clock className="h-4 w-4 mb-1 sm:mb-0 sm:mr-2" />
+                <span className="text-sm whitespace-normal text-center">Temporizador</span>
               </TabsTrigger>
-              <TabsTrigger value="settings" className="flex-1">
-                <Settings className="h-4 w-4 mr-2" />
-                Configuración
+              <TabsTrigger value="settings" className="flex-1 flex-col sm:flex-row h-auto py-2 px-1">
+                <Settings className="h-4 w-4 mb-1 sm:mb-0 sm:mr-2" />
+                <span className="text-sm whitespace-normal text-center">Configuración</span>
               </TabsTrigger>
-              <TabsTrigger value="tasks" className="flex-1">
-                <LayoutGrid className="h-4 w-4 mr-2" />
-                Tareas
+              <TabsTrigger value="tasks" className="flex-1 flex-col sm:flex-row h-auto py-2 px-1">
+                <LayoutGrid className="h-4 w-4 mb-1 sm:mb-0 sm:mr-2" />
+                <span className="text-sm whitespace-normal text-center">Tareas</span>
               </TabsTrigger>
             </TabsList>
 
@@ -249,47 +254,52 @@ export default function HubPageClient({
 
         {/* Sidebar Statistics */}
         <div className="lg:col-span-4 space-y-6">
-          {/* Stats Card */}
+          {/* Combined Stats Card - Focus Time, Streak and Today's Sessions */}
           <Card className="bg-[#1a1a2e] border-gray-800">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-white">Tiempo de Enfoque Total</CardTitle>
-              <CardDescription className="text-gray-400">Tu progreso general</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="text-3xl font-bold text-purple-400">
-                {formatMinutes(profile?.total_focus_time || 0)}
-              </p>
-            </CardContent>
-          </Card>
-
-          {/* Streak Card */}
-          <Card className="bg-[#1a1a2e] border-gray-800">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-white">Racha Actual</CardTitle>
-              <CardDescription className="text-gray-400">Días consecutivos enfocado</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="text-3xl font-bold text-purple-400">{profile?.streak_days || 0} días</p>
-            </CardContent>
-          </Card>
-
-          {/* Recent Sessions */}
-          <Card className="bg-[#1a1a2e] border-gray-800">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-white">Sesiones de Hoy</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 gap-4 my-2">
-                <div className="bg-[#262638] p-4 rounded-lg">
-                  <div className="text-gray-400 text-sm mb-1">Sesiones</div>
-                  <div className="text-2xl font-bold text-purple-400">
-                    {recentSessions.length}
+            <CardContent className="p-0">
+              {/* Top row: Focus Time and Streak */}
+              <div className="grid grid-cols-1 md:grid-cols-2 divide-x divide-gray-800">
+                {/* Left side - Focus Time */}
+                <div className="p-5 text-center">
+                  <div className="h-6 flex items-center justify-center">
+                    <Clock className="h-4 w-4 mr-2 text-purple-400" />
+                    <h3 className="text-white text-base font-medium">Tiempo</h3>
                   </div>
+                  <p className="text-2xl font-bold text-purple-400 mt-2">
+                    {formatMinutes(profile?.total_focus_time || 0)}
+                  </p>
+                  <p className="text-gray-400 text-xs mt-1">Tiempo total acumulado</p>
                 </div>
-                <div className="bg-[#262638] p-4 rounded-lg">
-                  <div className="text-gray-400 text-sm mb-1">Tiempo Total</div>
-                  <div className="text-2xl font-bold text-purple-400">
-                    {formatMinutes(calculateTodaysTotalMinutes())}
+
+                {/* Right side - Streak */}
+                <div className="p-5 text-center">
+                  <div className="h-6 flex items-center justify-center">
+                    <Flame className="h-4 w-4 mr-2 text-orange-400" />
+                    <h3 className="text-white text-base font-medium">Racha Actual</h3>
+                  </div>
+                  <p className="text-2xl font-bold text-orange-400 mt-2">{profile?.streak_days || 0} días</p>
+                  <p className="text-gray-400 text-xs mt-1">Días consecutivos activo</p>
+                </div>
+              </div>
+
+              {/* Horizontal divider */}
+              <div className="border-t border-gray-800"></div>
+
+              {/* Bottom section - Today's Sessions */}
+              <div className="p-5">
+                <h3 className="text-white text-base font-medium mb-3 text-center">Sesiones de Hoy</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="bg-[#262638] p-3 rounded-lg text-center">
+                    <div className="text-gray-400 text-xs mb-1">Sesiones</div>
+                    <div className="text-xl font-bold text-purple-400">
+                      {recentSessions.length}
+                    </div>
+                  </div>
+                  <div className="bg-[#262638] p-3 rounded-lg text-center">
+                    <div className="text-gray-400 text-xs mb-1">Tiempo Total</div>
+                    <div className="text-xl font-bold text-purple-400">
+                      {formatMinutes(calculateTodaysTotalMinutes())}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -298,7 +308,7 @@ export default function HubPageClient({
 
           {/* Current Technique Card */}
           {timerSettings && (
-            <Card className="bg-[#1a1a2e] border-gray-800">
+            <Card className="bg-[#1a1a2e] border-gray-800 mb-24">
               <CardHeader className="pb-2">
                 <CardTitle className="text-white">Técnica Actual</CardTitle>
                 <CardDescription className="text-gray-400">

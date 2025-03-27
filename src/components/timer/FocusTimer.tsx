@@ -305,7 +305,6 @@ export default function FocusTimer({
     setIsBreak(true);
     setMinutes(defaultBreakLength);
     setSeconds(0);
-    setSessionCount(prevCount => prevCount + 1);
     setIsActive(true);
     setShowBreakPrompt(false);
     toast.success("¡Comenzando descanso!");
@@ -440,6 +439,8 @@ export default function FocusTimer({
       await supabase.rpc("increment_focus_time", {
         minutes_to_add: durationInMinutes,
       });
+
+      setSessionCount(prevCount => prevCount + 1);
 
       setCurrentSessionId(null);
       setStartTime(null);
