@@ -132,7 +132,7 @@ export default function TaskManager({ tasks: initialTasks = [], onTasksChanged }
   useEffect(() => {
     if (initialTasks?.length > 0) {
       const filteredTasks = initialTasks.filter(task => !task.deleted);
-      setTasks(sortTasksByStatus(filteredTasks));
+      setTasks(sortTasksByStatus(filteredTasks).slice(0, tasksPerPage));
     }
     // Set initialLoading to true if either counts are loading OR initialTasks haven't arrived yet
     setInitialLoading(countLoading || initialTasks === undefined);

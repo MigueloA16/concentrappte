@@ -32,8 +32,8 @@ export default async function HubPage() {
     .lt("end_time", new Date(today.getTime() + 86400000).toISOString().split('T')[0]) // Before tomorrow
     .order("end_time", { ascending: false });
 
-  // Get recent tasks - ensure we filter out deleted tasks
-  const { data: recentTasks } = await supabase
+  // Get all tasks - ensure we filter out deleted tasks
+  const { data: allTasks } = await supabase
     .from("tasks")
     .select("*")
     .eq("user_id", profile?.id || '')
@@ -44,8 +44,8 @@ export default async function HubPage() {
     <Suspense fallback={<div>Loading...</div>}>
       <HubPageClient
         initialTimerSettings={timerSettings}
-        initialRecentTasks={recentTasks || []}
-        initialRecentSessions={todaySessions || []}
+        initialAllTasks={allTasks || []}
+        initialTodaySessions={todaySessions || []}
         initialProfile={profile}
       />
     </Suspense>
