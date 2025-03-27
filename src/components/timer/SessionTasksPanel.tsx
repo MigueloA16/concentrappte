@@ -477,8 +477,8 @@ const SessionTasksPanel: React.FC<SessionTasksPanelProps> = ({
 
         toast.info(
             taskToToggle.isTracking
-                ? "Task time tracking paused"
-                : "Task time tracking started"
+                ? "Tiempo de tarea pausado"
+                : "Tiempo de tarea iniciado"
         );
     };
 
@@ -696,7 +696,7 @@ const SessionTasksPanel: React.FC<SessionTasksPanelProps> = ({
                                                 <div className="flex items-center justify-between text-xs">
                                                     <div className="flex-1 min-w-0">
                                                         <div className="flex items-center gap-2">
-                                                            <span className="truncate">{task.name}</span>
+                                                            <span className="break-words">{task.name}</span>
                                                             {getStatusBadge(task.status)}
                                                         </div>
 

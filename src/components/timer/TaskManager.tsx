@@ -141,30 +141,67 @@ export default function TaskManager({ tasks: initialTasks = [], onTasksChanged }
   // Fetch tasks for a specific page
   const fetchTasks = async (page = 1) => {
     try {
-      setLoading(true); // Use general loading for page fetches
+      setLoading(true);
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
-        setLoading(false); // Stop loading if no user
+        setLoading(false);
         return;
       }
 
-      const offset = (page - 1) * tasksPerPage;
-      const { data, error } = await supabase
+      // First fetch in_progress tasks
+      const { data: inProgressTasks, error: progressError } = await supabase
         .from("tasks")
         .select("*")
         .eq("user_id", user.id)
         .eq("deleted", false)
-        .order("created_at", { ascending: false }) // Keep default order for fetching
-        .range(offset, offset + tasksPerPage - 1);
+        .eq("status", "in_progress")
+        .order("created_at", { ascending: false });
 
-      if (error) throw error;
-      setTasks(sortTasksByStatus(data || [])); // Sort after fetching
+      if (progressError) throw progressError;
+
+      // Then fetch pending tasks
+      const { data: pendingTasks, error: pendingError } = await supabase
+        .from("tasks")
+        .select("*")
+        .eq("user_id", user.id)
+        .eq("deleted", false)
+        .eq("status", "pending")
+        .order("created_at", { ascending: false });
+
+      if (pendingError) throw pendingError;
+
+      // Finally fetch completed tasks
+      const { data: completedTasks, error: completedError } = await supabase
+        .from("tasks")
+        .select("*")
+        .eq("user_id", user.id)
+        .eq("deleted", false)
+        .eq("status", "completed")
+        .order("completed_at", { ascending: false });
+
+      if (completedError) throw completedError;
+
+      // Combine all tasks in the correct order
+      const allSortedTasks = [
+        ...(inProgressTasks || []),
+        ...(pendingTasks || []),
+        ...(completedTasks || [])
+      ];
+
+      // Set the total count
+      setTotalTasks(allSortedTasks.length);
+
+      // Paginate in memory
+      const startIndex = (page - 1) * tasksPerPage;
+      const tasksForPage = allSortedTasks.slice(startIndex, startIndex + tasksPerPage);
+
+      setTasks(tasksForPage);
       setCurrentPage(page);
     } catch (error) {
       console.error("Error fetching tasks:", error);
       toast.error("Error fetching tasks");
     } finally {
-      setLoading(false); // Stop general loading
+      setLoading(false);
     }
   };
 

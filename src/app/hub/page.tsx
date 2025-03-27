@@ -38,8 +38,7 @@ export default async function HubPage() {
     .select("*")
     .eq("user_id", profile?.id || '')
     .eq("deleted", false)  // Make sure deleted tasks are filtered out
-    .order("created_at", { ascending: false })
-    .limit(5);
+    .order("created_at", { ascending: false });
 
   return (
     <Suspense fallback={<div>Loading...</div>}>
