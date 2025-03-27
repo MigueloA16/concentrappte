@@ -262,12 +262,14 @@ export default function TaskManager({ tasks: initialTasks = [], onTasksChanged }
 
   // Update a task's status
   const updateTaskStatus = async (id: string, status: string) => {
-    if (loading) return; // Prevent concurrent updates
-    const taskToUpdate = tasks.find(task => task.id === id);
-    if (!taskToUpdate || taskToUpdate.status === status) return; // No change needed
+    // Find the task in the current local state to check if an update is needed
+    const taskToUpdateLocally = tasks.find(task => task.id === id);
+    // Prevent concurrent updates or updating to the same status
+    if (loading || !taskToUpdateLocally || taskToUpdateLocally.status === status) return;
 
     setLoading(true);
-    const oldStatus = taskToUpdate.status;
+    const oldStatus = taskToUpdateLocally.status; // Get old status from local copy
+
     try {
       const updates: Partial<Task> = { status, updated_at: new Date().toISOString() };
 
@@ -277,36 +279,43 @@ export default function TaskManager({ tasks: initialTasks = [], onTasksChanged }
         const { data: taskSessions, error: sessionsError } = await supabase
           .from("focus_sessions").select("duration_minutes")
           .eq("task_id", id).eq("is_completed", true);
+
         if (sessionsError) throw sessionsError;
+
         const totalDuration = taskSessions?.reduce((sum, session) => sum + (session.duration_minutes || 0), 0) || 0;
         updates.duration_minutes = Math.max(1, totalDuration); // Ensure at least 1 minute
+
       } else {
         updates.completed_at = null; // Reset completion date if moving away from completed
         // Optionally reset duration if needed: updates.duration_minutes = null;
       }
 
+      // Perform the database update
       const { error } = await supabase.from("tasks").update(updates).eq("id", id);
       if (error) throw error;
 
-      // Update local state
-      const updatedTasks = tasks.map(task => task.id === id ? { ...task, ...updates } : task);
-      setTasks(sortTasksByStatus(updatedTasks));
-
-      // Update counts
+      // Optimistically update counts immediately for header feedback
       setTaskCounts(prev => ({
         ...prev,
         [oldStatus]: Math.max(0, prev[oldStatus as keyof typeof prev] - 1),
         [status]: prev[status as keyof typeof prev] + 1
       }));
 
+      // Refetch the tasks for the CURRENT page to get the correct sorted/paginated list
+      await fetchTasks(currentPage); // This will reset `loading` to false inside fetchTasks
+      
       toast.success(`Tarea ${status === "completed" ? "completada" : "actualizada"}`);
       if (onTasksChanged) onTasksChanged();
+
+      // Note: setLoading(false) is now handled within fetchTasks's finally block
+
     } catch (error: any) {
       console.error("Error updating task:", error);
       toast.error(error.message || "Error updating task");
-    } finally {
+      // Ensure loading is false on error if fetchTasks wasn't called or failed before its finally block
       setLoading(false);
     }
+    // Removed finally block here as fetchTasks handles it on success path
   };
 
   // Delete a task (mark as deleted)
@@ -612,7 +621,7 @@ export default function TaskManager({ tasks: initialTasks = [], onTasksChanged }
                             {task.completed_at && <span className="flex items-center"><CheckCircle2 className="h-3 w-3 mr-1 flex-shrink-0 text-green-500" />{formatCompletedDate(task.completed_at)}</span>}
                           </>
                         )}
-                        {task.status === "in_progress" && <span className="text-blue-400 flex items-center"><AlertCircle className="h-3 w-3 mr-1 flex-shrink-0" />En sesión de enfoque</span>}
+                        {task.status === "in_progress" && <span className="text-blue-400 flex items-center"><AlertCircle className="h-3 w-3 mr-1 flex-shrink-0" />En progreso...</span>}
                       </div>
                     )}
                   </div>

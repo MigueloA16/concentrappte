@@ -304,17 +304,17 @@ export default function DashboardClient({
                   <div className="bg-[#262638] p-3 rounded-lg text-center">
                     <div className="flex flex-col items-center justify-center">
                       <div className="flex items-center gap-1">
-                        <Flame className="h-4 w-4 text-purple-400" />
-                        <span className="text-gray-400 text-sm">Racha Actual</span>
+                        <Flame className="h-4 w-4 text-orange-400" />
+                        <span className="text-white-400 font-bold text-sm">Racha Actual</span>
                       </div>
-                      <div className="text-xl font-bold text-purple-400 mt-1">{profile?.streak_days || 0} días</div>
+                      <div className="text-xl font-bold text-orange-400 mt-1">{profile?.streak_days || 0} días</div>
                     </div>
                   </div>
                   <div className="bg-[#262638] p-3 rounded-lg text-center">
                     <div className="flex flex-col items-center justify-center">
                       <div className="flex items-center gap-1">
                         <Trophy className="h-4 w-4 text-purple-400" />
-                        <span className="text-gray-400 text-sm">Mejor Racha</span>
+                        <span className="text-white-400 font-bold text-sm">Mejor Racha</span>
                       </div>
                       <div className="text-xl font-bold text-purple-400 mt-1">{profile?.best_streak || 0} días</div>
                     </div>
@@ -385,7 +385,7 @@ export default function DashboardClient({
           </div>
 
           {/* Focus Data section */}
-          <div className="border-t border-gray-800 px-6 py-4">
+          {/* <div className="border-t border-gray-800 px-6 py-4">
             <h3 className="text-lg font-semibold text-white mb-4">Datos de Enfoque</h3>
             <div className="grid grid-cols-2 gap-4">
               {isStatsLoading ? (
@@ -416,7 +416,7 @@ export default function DashboardClient({
                 </>
               )}
             </div>
-          </div>
+          </div> */}
         </Card>
 
         {/* Right column: Today's Focus and Total Progress */}
