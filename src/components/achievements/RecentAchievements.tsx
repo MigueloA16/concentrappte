@@ -182,7 +182,7 @@ export default function RecentAchievements({ achievements, isLoading = false }: 
         </div>
 
         {/* View all button for mobile */}
-        <div className="mt-4 md:hidden">
+        <div className="mt-4 mb-12 md:hidden">
           <Link href="/achievements">
             <Button className="w-full bg-purple-600 hover:bg-purple-700">
               Ver todos los logros

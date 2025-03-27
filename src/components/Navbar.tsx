@@ -38,7 +38,7 @@ export default function Navbar({ user }: NavbarProps) {
     <header className="border-b border-gray-800 bg-[#0f0f1a]">
       <div className="container flex h-16 items-center justify-between px-4 max-w-7xl mx-auto">
         <div className="flex items-center">
-          <Link href="/dashboard" className="flex items-center">
+          <Link href="/hub" className="flex items-center">
             <Clock className="h-6 w-6 mr-2 text-purple-400" />
             <span className="text-xl font-bold text-white">ConcentrAPPte</span>
           </Link>
