@@ -39,9 +39,13 @@ const CompactTaskSelection: React.FC<TaskSelectionProps> = ({
   const [isNewTaskMode, setIsNewTaskMode] = useState(false);
   const [pendingTasks, setPendingTasks] = useState<Task[]>([]);
 
-  // Filter pending tasks
+  // Filter pending tasks - ensure we filter out deleted tasks too
   useEffect(() => {
-    setPendingTasks(recentTasks.filter(task => task.status !== "completed"));
+    // Filter tasks that are not completed AND not deleted
+    setPendingTasks(recentTasks.filter(task => 
+      task.status !== "completed" && 
+      task.deleted !== true
+    ));
   }, [recentTasks]);
 
   // Handle task selection
@@ -83,7 +87,7 @@ const CompactTaskSelection: React.FC<TaskSelectionProps> = ({
     ? recentTasks.find(t => t.id === selectedTaskId)?.name || "Tarea seleccionada"
     : customTaskName.trim()
       ? customTaskName
-      : "Selecciona una tarea";
+      : "Selecciona una tarea (opcional)"; // Changed to indicate tasks are optional
 
   // Loading state
   if (isLoading) {
@@ -98,7 +102,7 @@ const CompactTaskSelection: React.FC<TaskSelectionProps> = ({
             value={customTaskName}
             onChange={handleTaskNameChange}
             onKeyDown={handleKeyDown}
-            placeholder="¿En qué estás trabajando?"
+            placeholder="¿En qué estás trabajando? (opcional)" // Changed to indicate tasks are optional
             className="bg-[#262638] border-gray-700 text-white placeholder:text-gray-500 h-9"
             autoFocus
             disabled={disabled}

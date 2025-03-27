@@ -16,7 +16,8 @@ import { Task, TimerSetting } from "@/lib/supabase/database.types";
 type FocusSession = {
   id: string;
   duration_minutes: number;
-  end_time: string; // Make sure end_time is included in the type
+  end_time: string;
+  notes?: string; // For storing session name and other info
   task?: {
     name: string;
   };
@@ -27,18 +28,17 @@ type Profile = {
   streak_days: number;
 };
 
-export default function HubPageClient({ 
-  initialTimerSettings, 
-  initialRecentTasks, 
+export default function HubPageClient({
+  initialTimerSettings,
+  initialRecentTasks,
   initialRecentSessions,
   initialProfile
-}: { 
+}: {
   initialTimerSettings: TimerSetting;
   initialRecentTasks: Task[];
   initialRecentSessions: FocusSession[];
   initialProfile: Profile;
 }) {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const tabParam = searchParams.get('tab');
 
@@ -66,40 +66,40 @@ export default function HubPageClient({
   };
 
   // Handle task status changes (completion, etc)
-const handleTaskStatusChange = () => {
+  const handleTaskStatusChange = () => {
     refreshData();
   };
 
   // Format the date for display
   const formatDate = (dateString: string) => {
     if (!dateString) return "";
-    
+
     const date = new Date(dateString);
     // Check if the date is today
     const today = new Date();
-    const isToday = date.getDate() === today.getDate() && 
-                  date.getMonth() === today.getMonth() && 
-                  date.getFullYear() === today.getFullYear();
-    
+    const isToday = date.getDate() === today.getDate() &&
+      date.getMonth() === today.getMonth() &&
+      date.getFullYear() === today.getFullYear();
+
     if (isToday) {
       // For today, show the time
       return `Hoy ${date.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}`;
     }
-    
+
     // Check if the date is yesterday
     const yesterday = new Date(today);
     yesterday.setDate(yesterday.getDate() - 1);
-    const isYesterday = date.getDate() === yesterday.getDate() && 
-                      date.getMonth() === yesterday.getMonth() && 
-                      date.getFullYear() === yesterday.getFullYear();
-                      
+    const isYesterday = date.getDate() === yesterday.getDate() &&
+      date.getMonth() === yesterday.getMonth() &&
+      date.getFullYear() === yesterday.getFullYear();
+
     if (isYesterday) {
       return "Ayer";
     }
-    
+
     // Otherwise show the date
-    return date.toLocaleDateString('es-ES', { 
-      day: 'numeric', 
+    return date.toLocaleDateString('es-ES', {
+      day: 'numeric',
       month: 'short'
     });
   };
@@ -131,28 +131,57 @@ const handleTaskStatusChange = () => {
         setTimerSettings(settings);
       }
 
-      // Fetch recent tasks
+      // Fetch recent tasks - ensure we filter out deleted tasks
       const { data: tasks, error: tasksError } = await supabase
         .from("tasks")
         .select("*")
         .eq("user_id", user.id)
-        .eq("deleted", false)
+        .eq("deleted", false)  // Make sure we filter out deleted tasks
         .order("created_at", { ascending: false })
         .limit(5);
 
       if (tasksError) throw tasksError;
       setRecentTasks(tasks || []);
 
-      // Fetch recent sessions
+      // Fetch recent sessions - don't depend on task relationship
       const { data: sessions, error: sessionsError } = await supabase
         .from("focus_sessions")
         .select("*, task:task_id(name)")
         .eq("user_id", user.id)
-        .order("end_time", { ascending: false })  // Order by end_time instead of start_time
+        .order("end_time", { ascending: false })
         .limit(5);
 
       if (sessionsError) throw sessionsError;
-      setRecentSessions(sessions || []);
+
+      // Process sessions to extract session name from notes if no task
+      const processedSessions = (sessions || []).map(session => {
+        let sessionName = "Sin tarea";
+
+        // Try to get session name from notes
+        if (session.notes) {
+          try {
+            const notesObj = JSON.parse(session.notes);
+            if (notesObj.session_name) {
+              sessionName = notesObj.session_name;
+            }
+          } catch (e) {
+            // If JSON parse fails, leave default name
+          }
+        }
+
+        // If task exists, use task name
+        if (session.task?.name) {
+          sessionName = session.task.name;
+        }
+
+        return {
+          ...session,
+          // Add session_display_name for rendering
+          session_display_name: sessionName
+        };
+      });
+
+      setRecentSessions(processedSessions);
 
       // Fetch user profile
       const { data: userProfile, error: profileError } = await supabase
@@ -180,7 +209,7 @@ const handleTaskStatusChange = () => {
   const handleTasksChanged = () => {
     refreshData();
   };
-  
+
   // Handle session completion
   const handleSessionComplete = () => {
     refreshData();
@@ -216,7 +245,6 @@ const handleTaskStatusChange = () => {
                 defaultFocusTime={timerSettings?.focus_time || 25}
                 defaultBreakLength={timerSettings?.break_length || 5}
                 defaultTargetSessions={timerSettings?.target_sessions || 4}
-                recentTasks={recentTasks || []}
                 techniqueId={timerSettings?.technique_id || "custom"}
                 onSessionComplete={handleSessionComplete}
                 onTaskStatusChange={handleTaskStatusChange}
@@ -225,16 +253,16 @@ const handleTaskStatusChange = () => {
 
             {/* Settings Tab Content */}
             <TabsContent value="settings" className="mt-6">
-              <TimerSettings 
-                initialSettings={timerSettings} 
+              <TimerSettings
+                initialSettings={timerSettings}
                 onSettingsChanged={handleTimerSettingsChanged}
               />
             </TabsContent>
 
             {/* Tasks Tab Content */}
             <TabsContent value="tasks" className="mt-6">
-              <TaskManager 
-                tasks={recentTasks || []} 
+              <TaskManager
+                tasks={recentTasks || []}
                 onTasksChanged={handleTasksChanged}
               />
             </TabsContent>
@@ -306,7 +334,10 @@ const handleTaskStatusChange = () => {
                   {recentSessions.map((session) => (
                     <li key={session.id} className="text-sm border-l-2 border-purple-600 pl-3 py-1">
                       <div className="flex justify-between">
-                        <span className="font-medium text-white">{session.task?.name || "Sin tarea"}</span>
+                        <span className="font-medium text-white">
+                          {/* Display session name from either task or notes */}
+                          {(session.task?.name || "Sin tarea")}
+                        </span>
                         <span className="text-gray-500 text-xs">
                           {formatDate(session.end_time)}
                         </span>

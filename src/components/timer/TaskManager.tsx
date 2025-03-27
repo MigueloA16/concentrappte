@@ -20,16 +20,16 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
-import { 
-  Play, 
-  MoreVertical, 
-  Clock, 
-  LayoutGrid, 
-  Trash, 
-  CheckCircle2, 
-  XCircle, 
-  ChevronLeft, 
-  ChevronRight, 
+import {
+  Play,
+  MoreVertical,
+  Clock,
+  LayoutGrid,
+  Trash,
+  CheckCircle2,
+  XCircle,
+  ChevronLeft,
+  ChevronRight,
   AlertCircle,
   Loader2
 } from "lucide-react";
@@ -62,7 +62,7 @@ export default function TaskManager({ tasks: initialTasks = [], onTasksChanged }
   const [currentPage, setCurrentPage] = useState(1);
   const [totalTasks, setTotalTasks] = useState(0);
   const tasksPerPage = 5;
-  
+
   // Count by status
   const [taskCounts, setTaskCounts] = useState({
     in_progress: 0,
@@ -74,11 +74,11 @@ export default function TaskManager({ tasks: initialTasks = [], onTasksChanged }
   const sortTasksByStatus = (taskArray: Task[]) => {
     return [...taskArray].sort((a, b) => {
       // First sort by status priority
-      const statusDiff = STATUS_ORDER[a.status as keyof typeof STATUS_ORDER] - 
-                         STATUS_ORDER[b.status as keyof typeof STATUS_ORDER];
-      
+      const statusDiff = STATUS_ORDER[a.status as keyof typeof STATUS_ORDER] -
+        STATUS_ORDER[b.status as keyof typeof STATUS_ORDER];
+
       if (statusDiff !== 0) return statusDiff;
-      
+
       // Then by creation date (newer first)
       return new Date(b.created_at || '').getTime() - new Date(a.created_at || '').getTime();
     });
@@ -131,7 +131,8 @@ export default function TaskManager({ tasks: initialTasks = [], onTasksChanged }
   // Initialize task list from props
   useEffect(() => {
     if (initialTasks?.length > 0) {
-      setTasks(sortTasksByStatus(initialTasks));
+      const filteredTasks = initialTasks.filter(task => !task.deleted);
+      setTasks(sortTasksByStatus(filteredTasks));
       setInitialLoading(false);
     }
   }, [initialTasks]);
@@ -140,7 +141,7 @@ export default function TaskManager({ tasks: initialTasks = [], onTasksChanged }
   const fetchTasks = async (page = 1) => {
     try {
       setLoading(true);
-      
+
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
         setLoading(false);
@@ -155,9 +156,9 @@ export default function TaskManager({ tasks: initialTasks = [], onTasksChanged }
         .from("tasks")
         .select("*")
         .eq("user_id", user.id)
-        .eq("deleted", false)
-        .order("created_at", { ascending: false }) // Order by creation date first
-        .range(offset, offset + tasksPerPage - 1); // Proper pagination range
+        .eq("deleted", false)  // Make sure this filter is present
+        .order("created_at", { ascending: false })
+        .range(offset, offset + tasksPerPage - 1);
 
       if (error) throw error;
 
@@ -172,12 +173,23 @@ export default function TaskManager({ tasks: initialTasks = [], onTasksChanged }
     }
   };
 
+  const checkInitialTasksForDeletedItems = () => {
+    if (initialTasks?.some(task => task.deleted)) {
+      console.warn("Warning: Received deleted tasks in initialTasks. Check server-side query filters.");
+    }
+  };
+  
+  // Call this in a useEffect that runs once
+  useEffect(() => {
+    checkInitialTasksForDeletedItems();
+  }, []);
+
   // Handle page changes
   const handlePageChange = (newPage: number) => {
     if (newPage < 1 || newPage > Math.max(1, Math.ceil(totalTasks / tasksPerPage))) {
       return; // Invalid page
     }
-    
+
     if (newPage !== currentPage) {
       fetchTasks(newPage);
     }
@@ -221,12 +233,12 @@ export default function TaskManager({ tasks: initialTasks = [], onTasksChanged }
       // If we're on the first page, add the task to the list
       if (currentPage === 1) {
         const updatedTasks = sortTasksByStatus([data, ...tasks]);
-        
+
         // Keep only up to tasksPerPage items
         if (updatedTasks.length > tasksPerPage) {
           updatedTasks.length = tasksPerPage;
         }
-        
+
         setTasks(updatedTasks);
       } else {
         // Navigate to first page to see the new task
@@ -339,7 +351,7 @@ export default function TaskManager({ tasks: initialTasks = [], onTasksChanged }
       // Remove task from the list
       const updatedTasks = tasks.filter(task => task.id !== id);
       setTasks(updatedTasks);
-      
+
       // Update counts
       setTotalTasks(prev => prev - 1);
       setTaskCounts(prev => ({
@@ -372,7 +384,7 @@ export default function TaskManager({ tasks: initialTasks = [], onTasksChanged }
   const startFocusSession = async (task: Task) => {
     try {
       setLoading(true);
-      
+
       // First update the task to in_progress status if needed
       if (task.status !== "in_progress") {
         const { error } = await supabase
@@ -446,12 +458,12 @@ export default function TaskManager({ tasks: initialTasks = [], onTasksChanged }
   // Format minutes to hours and minutes display
   const formatDuration = (minutes: number | undefined) => {
     if (minutes === undefined || minutes === null) return "N/A";
-    
+
     // Ensure at least 1 minute is displayed
     const displayMinutes = Math.max(1, minutes);
     const hours = Math.floor(displayMinutes / 60);
     const mins = displayMinutes % 60;
-    
+
     if (hours > 0) {
       return `${hours}h:${mins}m`;
     }
@@ -485,7 +497,7 @@ export default function TaskManager({ tasks: initialTasks = [], onTasksChanged }
   // Helper to format completed date nicely
   const formatCompletedDate = (dateString: string | null) => {
     if (!dateString) return "";
-    
+
     try {
       const date = new Date(dateString);
       return date.toLocaleDateString();
@@ -521,7 +533,7 @@ export default function TaskManager({ tasks: initialTasks = [], onTasksChanged }
                 <div className="bg-[#262638] p-2 rounded text-center">
                   <span className="text-blue-400 text-sm">En Progreso</span>
                   <div className="text-white font-semibold">{taskCounts.in_progress}</div>
-                </div>            
+                </div>
                 <div className="bg-[#262638] p-2 rounded text-center">
                   <span className="text-green-400 text-sm">Completadas</span>
                   <div className="text-white font-semibold">{taskCounts.completed}</div>

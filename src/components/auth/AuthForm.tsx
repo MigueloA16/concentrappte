@@ -79,7 +79,7 @@ export default function AuthForm({ view }: AuthFormProps) {
         toast.success("Registro exitoso! Por favor revisa tu email para verificar tu cuenta.");
         router.push("/auth/verify");
       } else {
-        const { data, error } = await supabase.auth.signInWithPassword({
+        const { error } = await supabase.auth.signInWithPassword({
           email,
           password,
         });
@@ -112,7 +112,7 @@ export default function AuthForm({ view }: AuthFormProps) {
       setAuthError(null);
       
       // Set up the OAuth sign-in
-      const { data, error } = await supabase.auth.signInWithOAuth({
+      const { error } = await supabase.auth.signInWithOAuth({
         provider,
         options: {
           redirectTo: `${getURL()}/auth/callback`,
