@@ -1,4 +1,3 @@
-// Fixed AudioPlayer with proper width handling
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
@@ -53,7 +52,7 @@ const AudioPlayer: React.FC = () => {
         if (firstScriptTag.parentNode) {
           firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
         }
-        
+
         window.onYouTubeIframeAPIReady = () => {
           setYoutubeReady(true);
         };
@@ -97,7 +96,7 @@ const AudioPlayer: React.FC = () => {
 
       const videoId = getYoutubeId(selectedSound.source);
       if (!videoId) return;
-      
+
       // Destroy existing player if it exists
       if (youtubePlayer) {
         youtubePlayer.destroy();
@@ -233,7 +232,7 @@ const AudioPlayer: React.FC = () => {
     const newVolume = parseInt(e.target.value);
     setVolume(newVolume);
     setIsMuted(newVolume === 0);
-    
+
     if (selectedSound.type === 'local' && audioRef.current) {
       audioRef.current.volume = newVolume / 100;
     } else if (selectedSound.type === 'youtube' && youtubePlayer) {
@@ -262,19 +261,19 @@ const AudioPlayer: React.FC = () => {
   };
 
   return (
-    <div className="mt-2 bg-[#131325] rounded-full px-4 py-2 flex items-center w-80 relative">
-      {/* Sound selection dropdown - Fixed with truncation */}
-      <div className="flex-none w-28">
+    <div className="mt-1 bg-[#131325] rounded-full px-4 py-2 flex items-center w-full relative">
+      {/* Sound selection dropdown - Updated to use full width */}
+      <div className="flex-grow flex-shrink basis-2/3 mr-2">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" className="h-8 p-0 text-xs text-gray-400 hover:text-white hover:bg-transparent">
-              <span className="truncate max-w-[100px]">{selectedSound.name}</span>
-              <ChevronDown className="h-3 w-3 ml-1 flex-shrink-0" />
+            <Button variant="ghost" className="h-8 px-3 text-xs text-gray-400 hover:text-white hover:bg-transparent w-full justify-between bg-[#1e1e30]/50 hover:bg-[#1e1e30] rounded-full">
+              <span className="truncate mr-2">{selectedSound.name}</span>
+              <ChevronDown className="h-3 w-3 flex-shrink-0" />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent className="bg-[#262638] border-gray-700 text-white">
             {SOUND_OPTIONS.map((sound) => (
-              <DropdownMenuItem 
+              <DropdownMenuItem
                 key={sound.id}
                 onClick={() => handleSoundSelect(sound)}
                 className="cursor-pointer hover:bg-[#333345]"
@@ -287,20 +286,20 @@ const AudioPlayer: React.FC = () => {
       </div>
 
       {/* Player controls */}
-      <div className="flex items-center space-x-2 ml-auto">
-        <button 
-          className="text-gray-400 hover:text-white flex-shrink-0" 
+      <div className="flex items-center space-x-2 flex-shrink-0">
+        <button
+          className="text-gray-400 hover:text-white flex-shrink-0"
           onClick={togglePlay}
         >
           {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
         </button>
-        <button 
+        <button
           className="text-gray-400 hover:text-white flex-shrink-0"
           onClick={playNextSound}
         >
           <SkipForward className="h-4 w-4" />
         </button>
-        <button 
+        <button
           className="text-gray-400 hover:text-white flex-shrink-0"
           onClick={toggleMute}
         >
@@ -315,7 +314,7 @@ const AudioPlayer: React.FC = () => {
             onChange={handleVolumeChange}
             className="absolute inset-0 w-full opacity-0 cursor-pointer"
           />
-          <div 
+          <div
             className="h-1 bg-gray-400 rounded-full"
             style={{ width: `${volume}%` }}
           ></div>

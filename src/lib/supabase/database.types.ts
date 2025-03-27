@@ -96,6 +96,7 @@ export interface Database {
           notes: string | null
           created_at: string | null
           updated_at: string | null
+          session_name: string | null  // Added session_name field
         }
         Insert: {
           id?: string
@@ -109,6 +110,7 @@ export interface Database {
           notes?: string | null
           created_at?: string | null
           updated_at?: string | null
+          session_name?: string | null  // Added session_name field
         }
         Update: {
           id?: string
@@ -122,6 +124,7 @@ export interface Database {
           notes?: string | null
           created_at?: string | null
           updated_at?: string | null
+          session_name?: string | null  // Added session_name field
         }
       }
       study_rooms: {
