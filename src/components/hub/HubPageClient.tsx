@@ -287,7 +287,7 @@ export default function HubPageClient({
 
               {/* Bottom section - Today's Sessions */}
               <div className="p-5">
-                <h3 className="text-white text-base font-medium mb-3 text-center">Sesiones de Hoy</h3>
+                <h3 className="text-white text-base font-medium mb-3 text-center">Hoy</h3>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="bg-[#262638] p-3 rounded-lg text-center">
                     <div className="text-gray-400 text-xs mb-1">Sesiones</div>
