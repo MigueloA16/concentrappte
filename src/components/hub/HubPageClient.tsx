@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Clock, Settings, LayoutGrid, Play } from "lucide-react";
+import { Clock, Settings, LayoutGrid } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import TimerSettings from "@/components/timer/TimerSettings";
 import FocusTimer from "@/components/timer/FocusTimer";
@@ -11,33 +11,36 @@ import { supabase } from "@/lib/supabase/client";
 import { useSearchParams } from "next/navigation";
 import { Task, TimerSetting } from "@/lib/supabase/database.types";
 
-
 type FocusSession = {
   id: string;
   duration_minutes: number;
   end_time: string;
-  notes?: string; // For storing session name and other info
+  notes?: string;
   task?: {
     name: string;
   };
 };
 
 type Profile = {
+  id: string;
+  username?: string;
   total_focus_time: number;
   streak_days: number;
 };
+
+interface HubPageClientProps {
+  initialTimerSettings: TimerSetting;
+  initialRecentTasks: Task[];
+  initialRecentSessions: FocusSession[];
+  initialProfile: Profile;
+}
 
 export default function HubPageClient({
   initialTimerSettings,
   initialRecentTasks,
   initialRecentSessions,
   initialProfile
-}: {
-  initialTimerSettings: TimerSetting;
-  initialRecentTasks: Task[];
-  initialRecentSessions: FocusSession[];
-  initialProfile: Profile;
-}) {
+}: HubPageClientProps) {
   const searchParams = useSearchParams();
   const tabParam = searchParams.get('tab');
 
@@ -62,11 +65,6 @@ export default function HubPageClient({
     const url = new URL(window.location.href);
     url.searchParams.set('tab', tab);
     window.history.pushState({}, '', url.toString());
-  };
-
-  // Handle task status changes (completion, etc)
-  const handleTaskStatusChange = () => {
-    refreshData();
   };
 
   // Refresh data function for when settings or tasks are changed
@@ -101,27 +99,33 @@ export default function HubPageClient({
         .from("tasks")
         .select("*")
         .eq("user_id", user.id)
-        .eq("deleted", false)  // Make sure we filter out deleted tasks
+        .eq("deleted", false)
         .order("created_at", { ascending: false })
         .limit(5);
 
       if (tasksError) throw tasksError;
       setRecentTasks(tasks || []);
 
-      // Fetch recent sessions - don't depend on task relationship
+      // Get today's date in YYYY-MM-DD format
+      const today = new Date();
+      const todayISOString = today.toISOString().split('T')[0];
+
+      // Fetch today's sessions
       const { data: sessions, error: sessionsError } = await supabase
         .from("focus_sessions")
         .select("*, task:task_id(name)")
         .eq("user_id", user.id)
-        .order("end_time", { ascending: false })
-        .limit(5);
+        .gte("end_time", todayISOString)
+        .lt("end_time", new Date(today.getTime() + 86400000).toISOString().split('T')[0])
+        .order("end_time", { ascending: false });
 
       if (sessionsError) throw sessionsError;
+      setRecentSessions(sessions || []);
 
       // Fetch user profile
       const { data: userProfile, error: profileError } = await supabase
         .from("profiles")
-        .select("total_focus_time, streak_days")
+        .select("id, username, total_focus_time, streak_days")
         .eq("id", user.id)
         .single();
 
@@ -148,6 +152,18 @@ export default function HubPageClient({
   // Handle session completion
   const handleSessionComplete = () => {
     refreshData();
+  };
+
+  // Format minutes to hours and minutes
+  const formatMinutes = (minutes: number) => {
+    const hours = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+    return hours > 0 ? `${hours}h ${mins}m` : `${mins}m`;
+  };
+
+  // Calculate today's total minutes
+  const calculateTodaysTotalMinutes = () => {
+    return recentSessions.reduce((total, session) => total + (session.duration_minutes || 0), 0);
   };
 
   return (
@@ -182,7 +198,7 @@ export default function HubPageClient({
                 defaultTargetSessions={timerSettings?.target_sessions || 4}
                 techniqueId={timerSettings?.technique_id || "custom"}
                 onSessionComplete={handleSessionComplete}
-                onTaskStatusChange={handleTaskStatusChange}
+                onTaskStatusChange={handleTasksChanged}
               />
             </TabsContent>
 
@@ -241,7 +257,7 @@ export default function HubPageClient({
             </CardHeader>
             <CardContent>
               <p className="text-3xl font-bold text-purple-400">
-                {Math.floor((profile?.total_focus_time || 0) / 60)} hrs {(profile?.total_focus_time || 0) % 60} mins
+                {formatMinutes(profile?.total_focus_time || 0)}
               </p>
             </CardContent>
           </Card>
@@ -273,16 +289,7 @@ export default function HubPageClient({
                 <div className="bg-[#262638] p-4 rounded-lg">
                   <div className="text-gray-400 text-sm mb-1">Tiempo Total</div>
                   <div className="text-2xl font-bold text-purple-400">
-                    {(() => {
-                      // Calculate total minutes from today's sessions
-                      const todayMinutes = recentSessions
-                        .reduce((total, session) => total + (session.duration_minutes || 0), 0);
-                      
-                      // Format as hours and minutes
-                      const hours = Math.floor(todayMinutes / 60);
-                      const mins = todayMinutes % 60;
-                      return hours > 0 ? `${hours}h ${mins}m` : `${mins}m`;
-                    })()}
+                    {formatMinutes(calculateTodaysTotalMinutes())}
                   </div>
                 </div>
               </div>

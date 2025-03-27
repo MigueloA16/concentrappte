@@ -17,34 +17,35 @@ export default async function HubPage() {
     .eq("user_id", profile?.id || '')
     .single();
 
-  // Get recent focus sessions - order by end_time now
+  // Get today's focus sessions
   const today = new Date();
   const todayISOString = today.toISOString().split('T')[0]; // YYYY-MM-DD format
-  
+
   const { data: todaySessions } = await supabase
     .from("focus_sessions")
     .select(`
-    *,
-    task:task_id (id, name)
-  `)
+      *,
+      task:task_id (id, name)
+    `)
     .eq("user_id", profile?.id || '')
     .gte("end_time", todayISOString) // Filter for sessions from today
     .lt("end_time", new Date(today.getTime() + 86400000).toISOString().split('T')[0]) // Before tomorrow
-    .order("end_time", { ascending: false }); // Sufficient limit for today's sessions
-    
-  // Get recent tasks
+    .order("end_time", { ascending: false });
+
+  // Get recent tasks - ensure we filter out deleted tasks
   const { data: recentTasks } = await supabase
     .from("tasks")
     .select("*")
     .eq("user_id", profile?.id || '')
+    .eq("deleted", false)  // Make sure deleted tasks are filtered out
     .order("created_at", { ascending: false })
     .limit(5);
 
   return (
     <Suspense fallback={<div>Loading...</div>}>
-      <HubPageClient 
-        initialTimerSettings={timerSettings} 
-        initialRecentTasks={recentTasks || []} 
+      <HubPageClient
+        initialTimerSettings={timerSettings}
+        initialRecentTasks={recentTasks || []}
         initialRecentSessions={todaySessions || []}
         initialProfile={profile}
       />

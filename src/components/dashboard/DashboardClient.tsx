@@ -8,7 +8,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/lib/supabase/client";
 import { toast } from "sonner";
-import { format, subDays, isToday, startOfYear, eachDayOfInterval } from "date-fns";
 import RecentAchievements from "@/components/achievements/RecentAchievements";
 import { ActivityHeatmap } from "@/components/dashboard/ActivityHeatmap";
 import {
@@ -93,12 +92,24 @@ interface DashboardClientProps {
   initialProfile: ProfileWithLevel;
   initialRecentSessions: FocusSession[];
   initialAchievements?: AchievementWithProgress[];
+  initialActivityData?: DailyActivity[];
+  periodStats?: {
+    last7Days: number;
+    last30Days: number;
+  };
+  totalStats?: {
+    count: number;
+    total_minutes: number;
+  };
 }
 
 export default function DashboardClient({
   initialProfile,
   initialRecentSessions,
-  initialAchievements = []
+  initialAchievements = [],
+  initialActivityData = [],
+  periodStats = { last7Days: 0, last30Days: 0 },
+  totalStats = { count: 0, total_minutes: 0 }
 }: DashboardClientProps) {
   const [profile, setProfile] = useState<ProfileWithLevel>({
     ...initialProfile,
@@ -109,126 +120,30 @@ export default function DashboardClient({
   });
   const [recentSessions, setRecentSessions] = useState<FocusSession[]>(initialRecentSessions || []);
   const [achievements, setAchievements] = useState<AchievementWithProgress[]>(initialAchievements);
+  const [activityData, setActivityData] = useState<DailyActivity[]>(initialActivityData);
   const [editingMotivation, setEditingMotivation] = useState(false);
   const [motivationText, setMotivationText] = useState(profile.daily_motivation || "");
   const [editingTarget, setEditingTarget] = useState(false);
   const [targetHours, setTargetHours] = useState(profile.target_hours || 100);
   const [loading, setLoading] = useState(false);
-  const [activityData, setActivityData] = useState<DailyActivity[]>([]);
-  const [totalSessions, setTotalSessions] = useState<{ count: number, minutes: number }>({ count: 0, minutes: 0 });
-  const [periodStats, setPeriodStats] = useState({
-    last7Days: 0,
-    last30Days: 0
-  });
-  const [isActivityLoading, setIsActivityLoading] = useState(true);
-  const [isStatsLoading, setIsStatsLoading] = useState(true);
-  const [isAchievementsLoading, setIsAchievementsLoading] = useState(true);
+  const [isStatsLoading, setIsStatsLoading] = useState(initialActivityData.length === 0);
+  const [isAchievementsLoading, setIsAchievementsLoading] = useState(initialAchievements.length === 0);
 
   // Get current level info
   const currentLevel = getUserLevel(profile.total_focus_time || 0);
   const levelProgress = getProgressToNextLevel(profile.total_focus_time || 0);
   const nextLevelInfo = getNextLevelInfo(profile.total_focus_time || 0);
 
-  // Fetch today's sessions and period stats
+  // Set initial loading states based on provided data
   useEffect(() => {
-    const fetchStats = async () => {
-      try {
-        setIsStatsLoading(true);
-        // Get current user
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return;
+    if (initialActivityData.length > 0) {
+      setIsStatsLoading(false);
+    }
 
-        // Get today's date and format it for comparison
-        const today = new Date();
-        // Get focus sessions for the last 30 days
-        const { data: sessions, error } = await supabase
-          .from("focus_sessions")
-          .select("duration_minutes, end_time")
-          .eq("user_id", user.id)
-          .order("end_time", { ascending: false });
-
-        if (error) throw error;
-
-
-      } catch (error) {
-        console.error("Error fetching stats:", error);
-      } finally {
-        setIsStatsLoading(false);
-      }
-    };
-
-    fetchStats();
-  }, []);
-
-  // Fetch activity data for heatmap
-  useEffect(() => {
-    const fetchActivityData = async () => {
-      try {
-        setIsActivityLoading(true);
-        // Get current user
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return;
-
-        const startDate = startOfYear(new Date());
-        const endDate = new Date();
-
-        // Get daily activity data
-        const { data, error } = await supabase
-          .from("daily_activity")
-          .select("date, total_minutes, sessions_count")
-          .eq("user_id", user.id)
-          .gte("date", startDate.toISOString().split('T')[0])
-          .lte("date", endDate.toISOString().split('T')[0])
-          .order("date", { ascending: true });
-
-        if (error) throw error;
-
-        // Create a map of dates
-        const activityMap = new Map();
-        data.forEach(day => {
-          activityMap.set(day.date, {
-            total_minutes: day.total_minutes,
-            sessions_count: day.sessions_count
-          });
-        });
-
-        // Generate all days in the interval
-        const allDays = eachDayOfInterval({ start: startDate, end: endDate });
-        const completeData = allDays.map(day => {
-          const dateStr = format(day, 'yyyy-MM-dd');
-          const activity = activityMap.get(dateStr);
-          return {
-            date: dateStr,
-            total_minutes: activity ? activity.total_minutes : 0,
-            sessions_count: activity ? activity.sessions_count : 0,
-            id: '',  // Add required id field for DailyActivity type
-            user_id: user.id, // Add required user_id field
-            created_at: dateStr, // Add required created_at field
-            updated_at: dateStr, // Add required updated_at field
-          };
-        });
-
-        setActivityData(completeData);
-
-      } catch (error) {
-        console.error("Error fetching activity data:", error);
-      } finally {
-        setIsActivityLoading(false);
-      }
-    };
-
-    fetchActivityData();
-  }, []);
-
-  // Load achievements
-  useEffect(() => {
-    setIsAchievementsLoading(achievements.length === 0);
-
-    // If we already have achievements loaded, we can stop loading
-    if (achievements.length > 0) {
+    if (initialAchievements.length > 0) {
       setIsAchievementsLoading(false);
     }
-  }, [achievements]);
+  }, [initialActivityData, initialAchievements]);
 
   // Save motivation text
   const saveMotivation = async () => {
@@ -304,6 +219,11 @@ export default function DashboardClient({
     const targetMinutes = (profile.target_hours || 100) * 60;
     const percentage = Math.min(Math.round((profile.total_focus_time / targetMinutes) * 100), 100);
     return percentage;
+  };
+
+  // Calculate today's total minutes from session data
+  const calculateTodaysTotalMinutes = () => {
+    return recentSessions.reduce((total, session) => total + (session.duration_minutes || 0), 0);
   };
 
   return (
@@ -524,16 +444,9 @@ export default function DashboardClient({
                   </div>
                   <div className="bg-[#262638] p-4 rounded-lg">
                     <div className="text-gray-400 text-sm mb-1">Duración</div>
-                    <div className="text-2xl font-bold text-purple-400">                    {(() => {
-                      // Calculate total minutes from today's sessions
-                      const todayMinutes = recentSessions
-                        .reduce((total, session) => total + (session.duration_minutes || 0), 0);
-
-                      // Format as hours and minutes
-                      const hours = Math.floor(todayMinutes / 60);
-                      const mins = todayMinutes % 60;
-                      return hours > 0 ? `${hours}h ${mins}m` : `${mins}m`;
-                    })()}</div>
+                    <div className="text-2xl font-bold text-purple-400">
+                      {formatMinutes(calculateTodaysTotalMinutes())}
+                    </div>
                   </div>
                 </>
               )}
@@ -578,11 +491,11 @@ export default function DashboardClient({
                   <>
                     <div className="bg-[#262638] p-4 rounded-lg">
                       <div className="text-gray-400 text-sm mb-1">Sesiones Totales</div>
-                      <div className="text-2xl font-bold text-purple-400">{recentSessions.length}</div>
+                      <div className="text-2xl font-bold text-purple-400">{totalStats.count}</div>
                     </div>
                     <div className="bg-[#262638] p-4 rounded-lg">
                       <div className="text-gray-400 text-sm mb-1">Tiempo Total</div>
-                      <div className="text-2xl font-bold text-purple-400">{formatMinutes(profile.total_focus_time || 0)}</div>
+                      <div className="text-2xl font-bold text-purple-400">{formatMinutes(totalStats.total_minutes)}</div>
                     </div>
                   </>
                 )}
@@ -641,7 +554,7 @@ export default function DashboardClient({
       <div className="hidden md:block">
         <ActivityHeatmap
           activityData={activityData}
-          isLoading={isActivityLoading}
+          isLoading={isStatsLoading}
         />
       </div>
     </div>
