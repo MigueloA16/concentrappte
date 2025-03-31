@@ -93,7 +93,7 @@ export default function AuthForm({ view }: AuthFormProps) {
           throw signInError;
         }
 
-        toast.success("Ingresaste exitosamente!");
+        toast.success("¡Ingresaste exitosamente!");
 
         // Force a refresh to ensure profile is created
         try {

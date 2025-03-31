@@ -1,15 +1,18 @@
 // src/components/achievements/RecentAchievements.tsx
 import React, { useMemo } from 'react';
 import Link from 'next/link';
-import { Trophy, ChevronRight } from 'lucide-react';
+import { Trophy, ChevronRight, Clock, Target } from 'lucide-react';
 
 // UI Components
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Badge } from '@/components/ui/badge';
 
 // Icons and Utilities
 import { iconMap } from '@/lib/achievement-icons';
+import { cn } from '@/lib/utils';
 
 // Types
 import { AchievementWithProgress } from '@/lib/supabase/database.types';
@@ -52,15 +55,53 @@ export default function RecentAchievements({
       })
       .slice(0, 3);
 
+    // Get achievement categories counts
+    const categoryStats = {
+      daily: achievements.filter(a => a.category === 'daily' && a.unlocked).length,
+      streak: achievements.filter(a => a.category === 'streak' && a.unlocked).length,
+      total: achievements.filter(a => a.category === 'total' && a.unlocked).length,
+      technique: achievements.filter(a => a.category === 'technique' && a.unlocked).length
+    };
+
     return {
       totalAchievements,
       unlockedCount,
       inProgressAchievements,
       recentUnlocked,
+      categoryStats,
       hasUnlocked: recentUnlocked.length > 0,
       hasInProgress: inProgressAchievements.length > 0
     };
   }, [achievements]);
+
+  // Format time elapsed since achievement unlock
+  const formatTimeElapsed = (timestamp: string): string => {
+    if (!timestamp) return '';
+
+    const unlockDate = new Date(timestamp);
+    const now = new Date();
+    const diffInDays = Math.floor((now.getTime() - unlockDate.getTime()) / (1000 * 60 * 60 * 24));
+
+    if (diffInDays === 0) return 'hoy';
+    if (diffInDays === 1) return 'ayer';
+    if (diffInDays < 7) return `hace ${diffInDays} días`;
+    if (diffInDays < 30) return `hace ${Math.floor(diffInDays / 7)} semanas`;
+    if (diffInDays < 365) return `hace ${Math.floor(diffInDays / 30)} meses`;
+    return `hace ${Math.floor(diffInDays / 365)} años`;
+  };
+
+  // Get requirement type label
+  const getRequirementTypeLabel = (type: string): string => {
+    switch (type) {
+      case 'daily_sessions': return 'sesiones diarias';
+      case 'total_sessions': return 'sesiones totales';
+      case 'streak_sessions': return 'racha de días';
+      case 'technique_pomodoro': return 'sesiones Pomodoro';
+      case 'technique_90_20': return 'sesiones 90/20';
+      case 'technique_52_17': return 'sesiones 52/17';
+      default: return type;
+    }
+  };
 
   // Render Loading State
   if (isLoading) {
@@ -129,7 +170,7 @@ export default function RecentAchievements({
               Has desbloqueado {achievementStats.unlockedCount} de {achievementStats.totalAchievements} logros
             </CardDescription>
           </div>
-          <Link href="/achievements">
+          <Link href="achievements">
             <Button variant="ghost" size="sm" className="text-gray-400 hover:text-white">
               Ver todos
               <ChevronRight className="ml-1 h-4 w-4" />
@@ -138,6 +179,26 @@ export default function RecentAchievements({
         </div>
       </CardHeader>
       <CardContent>
+        {/* Category progress badges */}
+        <div className="flex flex-wrap gap-2 mb-4">
+          <Badge variant="outline" className="bg-[#262638] border-gray-700 text-gray-300">
+            <Target className="h-3 w-3 mr-1 text-purple-400" />
+            Diarios: {achievementStats.categoryStats.daily}
+          </Badge>
+          <Badge variant="outline" className="bg-[#262638] border-gray-700 text-gray-300">
+            <Target className="h-3 w-3 mr-1 text-blue-400" />
+            Rachas: {achievementStats.categoryStats.streak}
+          </Badge>
+          <Badge variant="outline" className="bg-[#262638] border-gray-700 text-gray-300">
+            <Target className="h-3 w-3 mr-1 text-green-400" />
+            Totales: {achievementStats.categoryStats.total}
+          </Badge>
+          <Badge variant="outline" className="bg-[#262638] border-gray-700 text-gray-300">
+            <Target className="h-3 w-3 mr-1 text-orange-400" />
+            Técnicas: {achievementStats.categoryStats.technique}
+          </Badge>
+        </div>
+
         <div className="space-y-5">
           {/* Recently unlocked achievements section */}
           {achievementStats.hasUnlocked && (
@@ -148,15 +209,38 @@ export default function RecentAchievements({
                   const IconComponent = iconMap[achievement.icon_name as keyof typeof iconMap] || iconMap.Trophy;
 
                   return (
-                    <div key={achievement.id} className="flex items-center gap-3 p-2 rounded-md bg-[#262638]">
-                      <div className="bg-purple-900/40 text-purple-300 p-2 rounded-full">
-                        <IconComponent className="h-5 w-5" />
-                      </div>
-                      <div>
-                        <p className="text-white font-medium">{achievement.name}</p>
-                        <p className="text-gray-400 text-sm">{achievement.description}</p>
-                      </div>
-                    </div>
+                    <TooltipProvider key={achievement.id}>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <div className="flex items-center gap-3 p-2 rounded-md bg-[#262638] cursor-pointer">
+                            <div className="bg-purple-900/40 text-purple-300 p-2 rounded-full">
+                              <IconComponent className="h-5 w-5" />
+                            </div>
+                            <div className="flex-1">
+                              <div className="flex justify-between">
+                                <p className="text-white font-medium">{achievement.name}</p>
+                                <div className="flex items-center text-xs text-purple-300">
+                                  <Clock className="h-3 w-3 mr-1" />
+                                  {formatTimeElapsed(achievement.unlocked_at || '')}
+                                </div>
+                              </div>
+                              <p className="text-gray-400 text-sm">{achievement.description}</p>
+                            </div>
+                          </div>
+                        </TooltipTrigger>
+                        <TooltipContent className="bg-[#262638] border-gray-700 text-white w-64">
+                          <p className="text-sm mb-1">{achievement.description}</p>
+                          <p className="text-xs text-gray-400">
+                            Requisito: {achievement.requirement_value} {getRequirementTypeLabel(achievement.requirement_type)}
+                          </p>
+                          {achievement.unlocked_at && (
+                            <p className="text-xs text-purple-300 mt-1">
+                              Desbloqueado el {new Date(achievement.unlocked_at).toLocaleDateString()}
+                            </p>
+                          )}
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
                   );
                 })}
               </div>
