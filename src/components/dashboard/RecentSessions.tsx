@@ -33,6 +33,7 @@ import {
 // Supabase and Types
 import { supabase } from "@/lib/supabase/client";
 import { FocusSession } from "@/lib/supabase/database.types";
+import { cn } from "@/lib/utils";
 
 // Constants
 const SESSIONS_PER_PAGE = 5;
@@ -41,12 +42,14 @@ const SESSIONS_PER_PAGE = 5;
 interface RecentSessionsProps {
   sessions: FocusSession[];
   isLoading?: boolean;
+  className?: string;
   onSessionUpdated?: () => void;
 }
 
 export default function RecentSessions({
   sessions = [],
   isLoading = false,
+  className,
   onSessionUpdated
 }: RecentSessionsProps) {
   // State Management
@@ -57,11 +60,21 @@ export default function RecentSessions({
 
   // Memoized Pagination Logic
   const sessionPagination = useMemo(() => {
-    const totalSessions = sessions.length;
+    // Make sure sessions are sorted by end_time in descending order
+    const sortedSessions = [...sessions].sort((a, b) => {
+      // Convert to dates for comparison (handling null values)
+      const dateA = a.end_time ? new Date(a.end_time) : new Date(0);
+      const dateB = b.end_time ? new Date(b.end_time) : new Date(0);
+
+      // Sort in descending order (newest first)
+      return dateB.getTime() - dateA.getTime();
+    });
+
+    const totalSessions = sortedSessions.length;
     const totalPages = Math.ceil(totalSessions / SESSIONS_PER_PAGE);
     const start = (currentPage - 1) * SESSIONS_PER_PAGE;
     const end = start + SESSIONS_PER_PAGE;
-    const paginatedSessions = sessions.slice(start, end);
+    const paginatedSessions = sortedSessions.slice(start, end);
 
     return {
       totalSessions,
@@ -192,10 +205,10 @@ export default function RecentSessions({
         <CardHeader className="pb-2">
           <CardTitle className="text-white flex items-center">
             <Clock className="h-5 w-5 mr-2 text-purple-400" />
-            Sesiones Recientes
+            Historial de Sesiones
           </CardTitle>
           <CardDescription className="text-gray-400">
-            Tus sesiones registradas
+            Mostrando {sessionPagination.paginatedSessions.length} de {sessionPagination.totalSessions} sesiones
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -210,7 +223,7 @@ export default function RecentSessions({
   }
 
   return (
-    <Card className="bg-[#1a1a2e] border-gray-800">
+    <Card className={cn("bg-[#1a1a2e] border-gray-800", className)}>
       <CardHeader className="pb-2">
         <div className="flex justify-between items-center">
           <div>

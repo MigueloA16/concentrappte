@@ -21,11 +21,13 @@ import { AchievementWithProgress } from '@/lib/supabase/database.types';
 interface RecentAchievementsProps {
   achievements: AchievementWithProgress[];
   isLoading?: boolean;
+  className?: string;
 }
 
 export default function RecentAchievements({
   achievements,
-  isLoading = false
+  isLoading = false,
+  className
 }: RecentAchievementsProps) {
   // Memoized Calculations
   const achievementStats = useMemo(() => {
@@ -161,7 +163,7 @@ export default function RecentAchievements({
 
   // Render Achievements View
   return (
-    <Card className="bg-[#1a1a2e] border-gray-800">
+    <Card className={cn("bg-[#1a1a2e] border-gray-800", className)}>
       <CardHeader className="pb-2">
         <div className="flex justify-between items-center">
           <div>
