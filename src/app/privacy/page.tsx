@@ -128,13 +128,13 @@ export default function PrivacyPolicyPage() {
             </div>
             <div className="flex space-x-4 text-sm text-gray-400">
               <Link href="/privacy" className="hover:text-purple-400">
-                Privacy
+                Privacidad
               </Link>
               <Link href="/terms" className="hover:text-purple-400">
-                Terms
+                Términos de Uso
               </Link>
               <a href="mailto:concentrappte@gmail.com" className="hover:text-purple-400">
-                Contact
+                Contacto
               </a>
             </div>
           </div>
