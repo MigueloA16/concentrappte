@@ -608,7 +608,7 @@ const SessionTasksPanel: React.FC<SessionTasksPanelProps> = ({
                                                                 onClick={() => updateTaskStatus(task.id, "completed")}
                                                                 className="h-7 w-7 p-0 text-green-400 hover:text-green-300 hover:bg-green-900/20"
                                                                 disabled={actionLoading}
-                                                                title="Mark as completed"
+                                                                title="Completar la tarea"
                                                             >
                                                                 <CheckCircle2 className="h-3.5 w-3.5" />
                                                             </Button>
@@ -736,7 +736,7 @@ const SessionTasksPanel: React.FC<SessionTasksPanelProps> = ({
                                                             onClick={() => updateTaskStatus(task.id, "completed")}
                                                             className="h-7 w-7 p-0 text-green-400 hover:text-green-300 hover:bg-green-900/20"
                                                             disabled={actionLoading}
-                                                            title="Mark as completed"
+                                                            title="Completar la tarea"
                                                         >
                                                             <CheckCircle2 className="h-3.5 w-3.5" />
                                                         </Button>
