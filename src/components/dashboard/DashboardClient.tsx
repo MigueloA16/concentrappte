@@ -15,7 +15,8 @@ import {
   Target,
   Flame,
   Award,
-  Loader2
+  Loader2,
+  Quote
 } from "lucide-react";
 
 // UI Components
@@ -153,7 +154,7 @@ export default function DashboardClient({
   const formatMinutes = useCallback((minutes: number) => {
     const hours = Math.floor(minutes / 60);
     const mins = minutes % 60;
-    return `${hours}h:${mins}m`;
+    return `${hours}h ${mins}m`;
   }, []);
 
   const calculateTodaysTotalMinutes = useCallback(() => {
@@ -188,13 +189,13 @@ export default function DashboardClient({
       // Check if we've already updated the streak today to avoid duplicate calls
       const lastStreakUpdate = localStorage.getItem('lastStreakUpdate');
       const today = new Date().toDateString();
-      
+
       if (lastStreakUpdate !== today) {
         const updated = await updateDailyStreak();
         if (updated) {
           // Store today's date to avoid updating again on the same day
           localStorage.setItem('lastStreakUpdate', today);
-          
+
           // Refresh profile data to get updated streak count
           try {
             const { data: userProfile, error: profileError } = await supabase
@@ -202,7 +203,7 @@ export default function DashboardClient({
               .select("id, username, total_focus_time, streak_days, best_streak")
               .eq("id", profile.id)
               .single();
-  
+
             if (!profileError && userProfile) {
               setProfile(prev => ({
                 ...prev,
@@ -216,7 +217,7 @@ export default function DashboardClient({
         }
       }
     };
-    
+
     handleDailyStreak();
   }, []); // Make sure this runs only on mount
 
@@ -313,100 +314,133 @@ export default function DashboardClient({
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Left column: Level, Motivation and Focus Data */}
         <Card className="bg-[#1a1a2e] border-gray-800 overflow-hidden">
-          {/* Level section */}
+          {/* Level section with improved layout */}
           <CardHeader className="pb-2">
-            <div className="flex justify-between items-start">
-              {isStatsLoading ? (
-                <>
-                  <div className="flex items-center gap-2">
-                    <Skeleton className="w-12 h-12 rounded-full" />
-                    <div>
-                      <Skeleton className="w-24 h-5 mb-1" />
-                      <Skeleton className="w-40 h-4" />
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <Skeleton className="w-20 h-4 mb-1 ml-auto" />
-                    <Skeleton className="w-24 h-5 ml-auto" />
-                  </div>
-                </>
-              ) : (
-                <>
-                  <div className="flex items-center gap-2">
-                    <div className="w-12 h-12 rounded-full flex items-center justify-center bg-[#262638] border-2 border-purple-400">
-                      <Award className="h-6 w-6 text-purple-400" />
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-purple-400 font-bold">{levelInfo.currentLevel.name}</span>
-                        <span className="text-white">Nivel {LEVELS.findIndex(l => l.name === levelInfo.currentLevel.name) + 1}</span>
-                      </div>
-                      <CardDescription className="text-gray-400">
-                        {levelInfo.nextLevelInfo.name ?
-                          `${formatMinutes(levelInfo.nextLevelInfo.minutesNeeded)} más para alcanzar el nivel ${levelInfo.nextLevelInfo.name}` :
-                          "¡Has alcanzado el nivel máximo!"
-                        }
-                      </CardDescription>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <span className="text-sm text-gray-400">Tiempo Total</span>
-                    <div className="text-white font-semibold">{formatMinutes(profile.total_focus_time || 0)}</div>
-                  </div>
-                </>
-              )}
-            </div>
-            <div className="space-y-2 mt-2">
+            <div className="flex flex-col space-y-4">
+              {/* Main level and profile info - improved layout */}
               <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-400">Progreso</span>
-                <span className="text-sm text-gray-400">{levelInfo.levelProgress}%</span>
-              </div>
-              {isStatsLoading ? (
-                <Skeleton className="h-2 w-full" />
-              ) : (
-                <Progress
-                  value={levelInfo.levelProgress}
-                  className="h-2 bg-gray-700"
-                />
-              )}
-            </div>
+                {isStatsLoading ? (
+                  <>
+                    <div className="flex items-center gap-2">
+                      <Skeleton className="w-16 h-16 rounded-full" />
+                      <div>
+                        <Skeleton className="w-28 h-5 mb-1" />
+                        <Skeleton className="w-40 h-4" />
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <Skeleton className="w-20 h-4 mb-1 ml-auto" />
+                      <Skeleton className="w-24 h-5 ml-auto" />
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    {/* Left: Improved level badge and info */}
+                    <div className="flex items-center gap-3">
+                      <div className="relative">
+                        <div className={`w-16 h-16 rounded-full flex items-center justify-center bg-gradient-${levelInfo.currentLevel.color} border-2 border-purple-400 shadow-lg`}>
+                          <div className="w-14 h-14 rounded-full bg-[#1a1a2e] flex items-center justify-center">
+                            <Award className="h-8 w-8 text-purple-400" />
+                          </div>
+                        </div>
+                        <div className="absolute -bottom-1 -right-1 bg-[#1a1a2e] rounded-full px-1.5 py-0.5 border border-purple-500 text-xs font-bold text-purple-400">
+                          {LEVELS.findIndex(l => l.name === levelInfo.currentLevel.name) + 1}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="flex flex-col">
+                          <span className={`${levelInfo.currentLevel.textColor} font-bold text-xl`}>{levelInfo.currentLevel.name}</span>
+                          <CardDescription className="text-gray-400">
+                            {levelInfo.nextLevelInfo.name ?
+                              `Nivel ${LEVELS.findIndex(l => l.name === levelInfo.currentLevel.name) + 1}` :
+                              "¡Nivel máximo alcanzado!"
+                            }
+                          </CardDescription>
+                        </div>
+                      </div>
+                    </div>
 
-            {/* Streak info */}
-            <div className="mt-4 grid grid-cols-2 gap-2">
-              {isStatsLoading ? (
-                <>
-                  <Skeleton className="h-16 bg-[#262638]" />
-                  <Skeleton className="h-16 bg-[#262638]" />
-                </>
-              ) : (
-                <>
-                  <div className="bg-[#262638] p-3 rounded-lg text-center">
-                    <div className="flex flex-col items-center justify-center">
-                      <div className="flex items-center gap-1">
-                        <Flame className="h-4 w-4 text-orange-400" />
-                        <span className="text-white-400 font-bold text-sm">Racha Actual</span>
-                      </div>
-                      <div className="text-xl font-bold text-orange-400 mt-1">{profile?.streak_days || 0} días</div>
+                    {/* Right: Total time with improved visual */}
+                    <div className="bg-[#262638] p-3 rounded-lg text-center">
+                      <span className="text-sm text-gray-400 block">Tiempo Total</span>
+                      <div className="text-xl font-semibold text-purple-400">{formatMinutes(profile.total_focus_time || 0)}</div>
+                    </div>
+                  </>
+                )}
+              </div>
+
+              {/* Progress bar with improved visual */}
+              <div className="space-y-2">
+                <div className="flex justify-between items-center">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-gray-400">Progreso del nivel</span>
+                    {levelInfo.nextLevelInfo.name && (
+                      <span className="text-sm text-gray-500">
+                        • {formatMinutes(levelInfo.nextLevelInfo.minutesNeeded)} para {levelInfo.nextLevelInfo.name}
+                      </span>
+                    )}
+                  </div>
+                  <span className="text-sm font-medium text-purple-300">{levelInfo.levelProgress}%</span>
+                </div>
+                {isStatsLoading ? (
+                  <Skeleton className="h-3 w-full" />
+                ) : (
+                  <div className="relative pt-1">
+                    <div className="overflow-hidden h-3 text-xs flex rounded-full bg-gray-700">
+                      <div
+                        style={{ width: `${levelInfo.levelProgress}%` }}
+                        className={`shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-gradient-to-r ${levelInfo.currentLevel.color} transition-all duration-500 rounded-full`}
+                      ></div>
                     </div>
                   </div>
-                  <div className="bg-[#262638] p-3 rounded-lg text-center">
-                    <div className="flex flex-col items-center justify-center">
-                      <div className="flex items-center gap-1">
-                        <Trophy className="h-4 w-4 text-purple-400" />
-                        <span className="text-white-400 font-bold text-sm">Mejor Racha</span>
+                )}
+              </div>
+
+              {/* Streak info - keeping just the two original streak cards */}
+              <div className="grid grid-cols-2 gap-2 mt-1">
+                {isStatsLoading ? (
+                  <>
+                    <Skeleton className="h-20 bg-[#262638]" />
+                    <Skeleton className="h-20 bg-[#262638]" />
+                  </>
+                ) : (
+                  <>
+                    {/* Current streak card - enhanced styling */}
+                    <div className="bg-[#262638] p-3 rounded-lg">
+                      <div className="flex flex-col items-center justify-center">
+                        <div className="flex items-center gap-1 mb-1">
+                          <Flame className="h-4 w-4 text-orange-400" />
+                          <span className="text-white-400 font-bold text-sm">Racha Actual</span>
+                        </div>
+                        <div className="text-xl font-bold text-orange-400 mt-1">{profile?.streak_days || 0} días</div>
                       </div>
-                      <div className="text-xl font-bold text-purple-400 mt-1">{profile?.best_streak || 0} días</div>
                     </div>
-                  </div>
-                </>
-              )}
+
+                    {/* Best streak card - enhanced styling */}
+                    <div className="bg-[#262638] p-3 rounded-lg">
+                      <div className="flex flex-col items-center justify-center">
+                        <div className="flex items-center gap-1 mb-1">
+                          <Trophy className="h-4 w-4 text-purple-400" />
+                          <span className="text-white-400 font-bold text-sm">Mejor Racha</span>
+                        </div>
+                        <div className="text-xl font-bold text-purple-400 mt-1">{profile?.best_streak || 0} días</div>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
           </CardHeader>
 
-          {/* Daily Motivation section */}
-          <div className="border-t border-gray-800 px-6 py-4">
-            <div className="flex justify-between items-center mb-2">
-              <h3 className="text-lg font-semibold text-white">Motivación Diaria</h3>
+          {/* Daily Motivation section with improved styling */}
+          <div className="border-t border-gray-800 p-6">
+            <div className="flex justify-between items-center mb-3">
+              <div className="flex items-center gap-2">
+                <div className="bg-purple-500/20 p-1.5 rounded-md">
+                  <Quote className="h-4 w-4 text-purple-400" />
+                </div>
+                <h3 className="text-lg font-semibold text-white">Motivación Diaria</h3>
+              </div>
               <Button
                 variant="ghost"
                 size="sm"
@@ -459,7 +493,9 @@ export default function DashboardClient({
                 </div>
               </div>
             ) : (
-              <p className="text-gray-300 italic text-lg">"{profile.daily_motivation || 'Focus on the process, not just the outcome'}"</p>
+              <div className="bg-[#262638] p-4 rounded-lg border-l-4 border-purple-500">
+                <p className="text-gray-300 italic text-lg">"{profile.daily_motivation || 'Focus on the process, not just the outcome'}"</p>
+              </div>
             )}
           </div>
         </Card>
@@ -540,7 +576,7 @@ export default function DashboardClient({
                     </div>
                     <div className="bg-[#262638] p-4 rounded-lg">
                       <div className="text-gray-400 text-sm mb-1">Tiempo Total</div>
-                      <div className="text-2xl font-bold text-purple-400">{formatMinutes(totalStats.total_minutes)}</div>
+                      <div className="text-2xl font-bold text-purple-400">{formatMinutes(profile.total_focus_time)}</div>
                     </div>
                   </>
                 )}
