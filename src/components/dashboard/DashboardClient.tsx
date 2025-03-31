@@ -37,6 +37,7 @@ import {
   AchievementWithProgress,
   FocusSession
 } from "@/lib/supabase/database.types";
+import { updateDailyStreak } from "@/lib/streak";
 
 // Constants
 const LEVELS = [

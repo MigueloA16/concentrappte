@@ -23,7 +23,7 @@ export default function Navbar({ user }: NavbarProps) {
     if (error) {
       toast.error(error.message);
     } else {
-      toast.success("Signed out successfully");
+      toast.success("Cerraste sesión satisfactoriamente");
       router.push("/");
       router.refresh();
     }
