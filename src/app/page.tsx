@@ -25,12 +25,17 @@ export default function LandingPage() {
             </Link>
           </div>
 
-          <div className="flex items-center gap-4">
+          {/* Fixed: Changed the flex gap to a more specific flex layout for buttons */}
+          <div className="flex items-center">
             <Link href="/auth/sign-in" passHref>
-              <Button variant="ghost" className="text-gray-300 hover:text-white">Inicia Sesión</Button>
+              <Button variant="ghost" className="text-gray-300 hover:text-white text-xs sm:text-sm whitespace-nowrap">
+                Inicia Sesión
+              </Button>
             </Link>
             <Link href="/auth/sign-up" passHref>
-              <Button className="bg-purple-600 hover:bg-purple-700 text-white">¡Comienza!</Button>
+              <Button className="bg-purple-600 hover:bg-purple-700 text-white text-xs sm:text-sm ml-1 whitespace-nowrap">
+                ¡Comienza!
+              </Button>
             </Link>
           </div>
         </div>

@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, useMemo } from "react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
 
 // Icons
@@ -16,6 +16,7 @@ import {
 // UI Components
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { toast } from "sonner";
 
 // Custom Components
 import TimerSettings from "@/components/timer/TimerSettings";
@@ -24,6 +25,7 @@ import TaskManager from "@/components/timer/TaskManager";
 
 // Types
 import { Task, TimerSetting, FocusSession } from "@/lib/supabase/database.types";
+import { updateDailyStreak } from "@/lib/streak";
 
 type Profile = {
   id: string;
@@ -46,7 +48,8 @@ export default function HubPageClient({
   initialTodaySessions,
   initialProfile
 }: HubPageClientProps) {
-  // Search Params
+  // Router and Search Params
+  const router = useRouter();
   const searchParams = useSearchParams();
   const tabParam = searchParams.get('tab');
 
@@ -57,6 +60,9 @@ export default function HubPageClient({
   const [todaySessions, setTodaySessions] = useState<FocusSession[]>(initialTodaySessions || []);
   const [profile, setProfile] = useState<Profile>(initialProfile);
   const [loading, setLoading] = useState(false);
+  
+  // New state to track active session
+  const [isSessionActive, setIsSessionActive] = useState(false);
 
   // Memoized Calculations
   const todaysTotalMinutes = useMemo(() => {
@@ -68,6 +74,37 @@ export default function HubPageClient({
     const hours = Math.floor(minutes / 60);
     const mins = minutes % 60;
     return hours > 0 ? `${hours}h ${mins}m` : `${mins}m`;
+  }, []);
+
+  // Effect to check if there's an active session when component mounts
+  useEffect(() => {
+    const timerState = localStorage.getItem('timerState');
+    if (timerState) {
+      try {
+        const state = JSON.parse(timerState);
+        setIsSessionActive(state.isActive || false);
+      } catch (error) {
+        console.error("Error parsing timer state:", error);
+      }
+    }
+
+    const handleDailyStreak = async () => {
+      // Check if we've already updated the streak today to avoid duplicate calls
+      const lastStreakUpdate = localStorage.getItem('lastStreakUpdate');
+      const today = new Date().toDateString();
+      
+      if (lastStreakUpdate !== today) {
+        const updated = await updateDailyStreak();
+        if (updated) {
+          // Store today's date to avoid updating again on the same day
+          localStorage.setItem('lastStreakUpdate', today);
+          // Refresh data to get updated streak count
+          refreshData();
+        }
+      }
+    };
+    
+    handleDailyStreak();
   }, []);
 
   // Effects
@@ -151,7 +188,10 @@ export default function HubPageClient({
 
   // Event Handlers
   const handleTabChange = useCallback((tab: string) => {
+    // The check for active session is now handled in the tab wrappers
+    // Just handle the tab change logic here
     setActiveTab(tab);
+    
     // Update URL without navigation
     const url = new URL(window.location.href);
     url.searchParams.set('tab', tab);
@@ -166,7 +206,13 @@ export default function HubPageClient({
     refreshData();
   }, [refreshData]);
 
+  // Handle session state changes
+  const handleSessionStateChange = useCallback((isActive: boolean) => {
+    setIsSessionActive(isActive);
+  }, []);
+
   const handleSessionComplete = useCallback(() => {
+    setIsSessionActive(false);
     refreshData();
   }, [refreshData]);
 
@@ -182,22 +228,68 @@ export default function HubPageClient({
           <Tabs 
             defaultValue={activeTab} 
             value={activeTab} 
-            onValueChange={handleTabChange} 
+            onValueChange={(value) => {
+              // This will only run when a non-disabled tab is clicked
+              handleTabChange(value);
+            }} 
             className="w-full"
           >
             <TabsList className="bg-[#1a1a2e] border border-gray-800 w-full h-auto">
-              <TabsTrigger value="timer" className="flex-1 flex-col sm:flex-row h-auto py-2 px-1">
+              <TabsTrigger 
+                value="timer" 
+                className="flex-1 flex-col sm:flex-row h-auto py-2 px-1"
+              >
                 <Clock className="h-4 w-4 mb-1 sm:mb-0 sm:mr-2" />
                 <span className="text-sm whitespace-normal text-center">Temporizador</span>
               </TabsTrigger>
-              <TabsTrigger value="settings" className="flex-1 flex-col sm:flex-row h-auto py-2 px-1">
-                <Settings className="h-4 w-4 mb-1 sm:mb-0 sm:mr-2" />
-                <span className="text-sm whitespace-normal text-center">Configuración</span>
-              </TabsTrigger>
-              <TabsTrigger value="tasks" className="flex-1 flex-col sm:flex-row h-auto py-2 px-1">
-                <LayoutGrid className="h-4 w-4 mb-1 sm:mb-0 sm:mr-2" />
-                <span className="text-sm whitespace-normal text-center">Tareas</span>
-              </TabsTrigger>
+              
+              {/* Custom wrapper to handle disabled state - Settings tab */}
+              <div 
+                className={`
+                  flex-1 flex-col sm:flex-row h-auto py-2 px-1 
+                  flex items-center justify-center cursor-pointer
+                  text-sm whitespace-normal text-center
+                  rounded-md transition-colors
+                  ${activeTab === "settings" 
+                    ? "bg-background text-white dark:text-foreground data-[state=active]:shadow-sm" 
+                    : "text-foreground dark:text-muted-foreground"}
+                  ${isSessionActive ? 'opacity-50 hover:bg-transparent' : 'hover:bg-gray-800/50'}
+                `}
+                onClick={() => {
+                  if (isSessionActive && activeTab === "timer") {
+                    toast.warning("Por favor finaliza la sesión");
+                    return;
+                  }
+                  handleTabChange("settings");
+                }}
+              >
+                <Settings className={`h-4 w-4 mb-1 sm:mb-0 sm:mr-2 ${activeTab === "settings" ? "text-purple-400" : ""}`} />
+                <span>Configuración</span>
+              </div>
+              
+              {/* Custom wrapper to handle disabled state - Tasks tab */}
+              <div 
+                className={`
+                  flex-1 flex-col sm:flex-row h-auto py-2 px-1 
+                  flex items-center justify-center cursor-pointer
+                  text-sm whitespace-normal text-center
+                  rounded-md transition-colors
+                  ${activeTab === "tasks" 
+                    ? "bg-background text-white dark:text-foreground data-[state=active]:shadow-sm" 
+                    : "text-foreground dark:text-muted-foreground"}
+                  ${isSessionActive ? 'opacity-50 hover:bg-transparent' : 'hover:bg-gray-800/50'}
+                `}
+                onClick={() => {
+                  if (isSessionActive && activeTab === "timer") {
+                    toast.warning("Por favor finaliza la sesión");
+                    return;
+                  }
+                  handleTabChange("tasks");
+                }}
+              >
+                <LayoutGrid className={`h-4 w-4 mb-1 sm:mb-0 sm:mr-2 ${activeTab === "tasks" ? "text-purple-400" : ""}`} />
+                <span>Tareas</span>
+              </div>
             </TabsList>
 
             {/* Timer Tab Content */}
@@ -209,6 +301,7 @@ export default function HubPageClient({
                 techniqueId={timerSettings?.technique_id || "custom"}
                 onSessionComplete={handleSessionComplete}
                 onTaskStatusChange={handleTasksChanged}
+                onSessionStateChange={handleSessionStateChange}
               />
             </TabsContent>
 

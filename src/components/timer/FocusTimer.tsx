@@ -26,6 +26,7 @@ type FocusTimerProps = {
   techniqueId?: string;
   onSessionComplete?: () => void;
   onTaskStatusChange?: () => void;
+  onSessionStateChange?: (isActive: boolean) => void;
 };
 
 export default function FocusTimer({
@@ -34,7 +35,8 @@ export default function FocusTimer({
   defaultTargetSessions = 4,
   techniqueId = "custom",
   onSessionComplete,
-  onTaskStatusChange
+  onTaskStatusChange,
+  onSessionStateChange
 }: FocusTimerProps) {
   // Timer state
   const [minutes, setMinutes] = useState(defaultFocusTime);
@@ -55,12 +57,18 @@ export default function FocusTimer({
   // Session time tracking
   const [sessionStartTime, setSessionStartTime] = useState<Date | null>(null);
 
-  // --- New State for Session Name Input ---
+  // New state for Session Name Input
   const [sessionNameInput, setSessionNameInput] = useState("");
-  // -----------------------------------------
 
   // Audio ref for notifications
   const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  // Notify parent about session state changes
+  useEffect(() => {
+    if (onSessionStateChange) {
+      onSessionStateChange(isActive);
+    }
+  }, [isActive, onSessionStateChange]);
 
   // Initialize audio
   useEffect(() => {
@@ -179,12 +187,17 @@ export default function FocusTimer({
         if (state.startTime) {
           setStartTime(new Date(state.startTime));
         }
+
+        // Notify parent about restored session state
+        if (onSessionStateChange) {
+          onSessionStateChange(state.isActive);
+        }
       } catch (error) {
         console.error("Error restoring timer state:", error);
         localStorage.removeItem('timerState');
       }
     }
-  }, [defaultBreakLength, defaultFocusTime, techniqueId]);
+  }, [defaultBreakLength, defaultFocusTime, techniqueId, onSessionStateChange]);
 
   // Timer logic
   useEffect(() => {
@@ -260,7 +273,7 @@ export default function FocusTimer({
 
       // Create a new focus session in Supabase - no task relationship
       const now = new Date();
-      // --- Prepare session data, including optional name ---
+      // Prepare session data, including optional name
       const sessionData: {
         user_id: string;
         start_time: string;
@@ -278,11 +291,10 @@ export default function FocusTimer({
       if (trimmedName) {
         sessionData.session_name = trimmedName;
       }
-      // ----------------------------------------------------
 
       const { data, error } = await supabase
         .from("focus_sessions")
-        .insert(sessionData) // <-- Send the potentially modified sessionData
+        .insert(sessionData)
         .select()
         .single();
 
@@ -293,9 +305,14 @@ export default function FocusTimer({
       setSessionStartTime(now); // Set overall session start time
       setIsActive(true);
       setShowBreakPrompt(false);
-      setSessionNameInput(""); // <-- Reset input field after successful start
+      setSessionNameInput(""); // Reset input field after successful start
 
       toast.success("¡Sesión de enfoque iniciada!");
+
+      // Notify parent that session is now active
+      if (onSessionStateChange) {
+        onSessionStateChange(true);
+      }
     } catch (error) {
       console.error("Error al iniciar la sesión:", error);
       toast.error(error instanceof Error ? error.message : "Error al iniciar la sesión");
@@ -303,11 +320,15 @@ export default function FocusTimer({
       setLoading(false);
     }
   };
-
   // Pause the timer
   const pauseTimer = () => {
     setIsActive(false);
     toast.info(isBreak ? "Descanso pausado" : "Sesión de enfoque pausada");
+
+    // Notify parent that session is now paused
+    if (onSessionStateChange) {
+      onSessionStateChange(false);
+    }
   };
 
   // Clean up timer state
@@ -317,8 +338,12 @@ export default function FocusTimer({
     setStartTime(null);
     setSessionStartTime(null);
     setShowBreakPrompt(false);
-    // Also clear potential session name input if resetting entirely
     setSessionNameInput("");
+
+    // Notify parent that session is now inactive
+    if (onSessionStateChange) {
+      onSessionStateChange(false);
+    }
   };
 
   // Start the break session
@@ -329,6 +354,11 @@ export default function FocusTimer({
     setIsActive(true);
     setShowBreakPrompt(false);
     toast.success("¡Comenzando descanso!");
+
+    // Notify parent that session is now active (break is active)
+    if (onSessionStateChange) {
+      onSessionStateChange(true);
+    }
   };
 
   // Skip the break
@@ -352,6 +382,11 @@ export default function FocusTimer({
     setStartTime(null);
     // Clear potential session name input when skipping break
     setSessionNameInput("");
+
+    // Notify parent that session is now inactive
+    if (onSessionStateChange) {
+      onSessionStateChange(false);
+    }
   };
   // Function to finish session early
   const finishEarly = async () => {
@@ -411,6 +446,11 @@ export default function FocusTimer({
         onSessionComplete();
       }
 
+      // Notify parent that session is now inactive
+      if (onSessionStateChange) {
+        onSessionStateChange(false);
+      }
+
       toast.success(`¡Sesión completada! Has registrado ${minutesElapsed} minutos de enfoque.`);
 
       // If we've completed all sessions, reset the counter
@@ -426,7 +466,6 @@ export default function FocusTimer({
       setLoading(false);
     }
   };
-
   // Reset the timer
   const resetTimer = () => {
     setIsActive(false);
