@@ -17,9 +17,9 @@ export default function LandingPage() {
 
           {/* Center Navigation Links */}
           <div className="hidden md:flex items-center space-x-6">
-            <Link href="#pricing" className="text-gray-300 hover:text-white transition-colors">
+            {/* <Link href="#pricing" className="text-gray-300 hover:text-white transition-colors">
               Precio
-            </Link>
+            </Link> */}
             <Link href="#faq" className="text-gray-300 hover:text-white transition-colors">
               Preguntas Frecuentes
             </Link>
@@ -45,8 +45,11 @@ export default function LandingPage() {
         <section className="py-10 md:py-18 bg-[#0f0f1a]">
           <div className="container px-4 md:px-6 max-w-7xl mx-auto">
             <div className="flex flex-col items-center text-center space-y-3">
-              <div className="inline-flex items-center rounded-full border px-2.5 py-0.5 font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 mb-4 mt-6 text-base bg-violet-500/10 text-violet-400 border-violet-500/20">
+              {/* <div className="inline-flex items-center rounded-full border px-2.5 py-0.5 font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 mb-4 mt-6 text-base bg-violet-500/10 text-violet-400 border-violet-500/20">
                 Aumenta tu productividad por menos de lo que valen dos 🍔
+              </div> */}
+              <div className="inline-flex items-center rounded-full border px-2.5 py-0.5 font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 mb-4 mt-6 text-base bg-violet-500/10 text-violet-400 border-violet-500/20">
+                Aumenta tu productividad llevando un mejor control de tu tiempo
               </div>
               <h1 className="text-3xl font-bold tracking-tighter sm:text-5xl md:text-6xl bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-blue-400">
                 Una forma más inteligente
@@ -902,7 +905,7 @@ export default function LandingPage() {
 
 
         {/* One Simple Price Section */}
-        <section id="pricing" className="py-16 bg-[#0f0f1a]">
+        {/* <section id="pricing" className="py-16 bg-[#0f0f1a]">
           <div className="container px-4 md:px-6 max-w-7xl mx-auto">
             <div className="flex flex-col items-center text-center space-y-2 mb-12">
               <h2 className="text-3xl font-bold tracking-tighter md:text-4xl">
@@ -1032,7 +1035,7 @@ export default function LandingPage() {
               </div>
             </div>
           </div>
-        </section>
+        </section> */}
 
         {/* Who Uses Our Focus Timer section */}
         <section id="users" className="py-16 bg-black">
@@ -1157,7 +1160,7 @@ export default function LandingPage() {
               </div>
 
               {/* Question 2 */}
-              <div className="bg-[#1a1a2e] rounded-lg p-6 border border-gray-800">
+              {/* <div className="bg-[#1a1a2e] rounded-lg p-6 border border-gray-800">
                 <div className="flex items-start gap-4">
                   <div className="flex-shrink-0 h-6 w-6 mt-1 rounded-full bg-[#262638] flex items-center justify-center">
                     <MessageCircleQuestion className="h-4 w-4 text-purple-400" />
@@ -1169,7 +1172,7 @@ export default function LandingPage() {
                     </p>
                   </div>
                 </div>
-              </div>
+              </div> */}
 
               {/* Question 3 */}
               <div className="bg-[#1a1a2e] rounded-lg p-6 border border-gray-800">
