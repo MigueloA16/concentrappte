@@ -181,6 +181,44 @@ export default function DashboardClient({
     }
   }, [initialActivityData, initialAchievements, initialTodaySessions]);
 
+  useEffect(() => {
+    // Add daily streak update when the component mounts
+    const handleDailyStreak = async () => {
+      // Check if we've already updated the streak today to avoid duplicate calls
+      const lastStreakUpdate = localStorage.getItem('lastStreakUpdate');
+      const today = new Date().toDateString();
+      
+      if (lastStreakUpdate !== today) {
+        const updated = await updateDailyStreak();
+        if (updated) {
+          // Store today's date to avoid updating again on the same day
+          localStorage.setItem('lastStreakUpdate', today);
+          
+          // Refresh profile data to get updated streak count
+          try {
+            const { data: userProfile, error: profileError } = await supabase
+              .from("profiles")
+              .select("id, username, total_focus_time, streak_days, best_streak")
+              .eq("id", profile.id)
+              .single();
+  
+            if (!profileError && userProfile) {
+              setProfile(prev => ({
+                ...prev,
+                streak_days: userProfile.streak_days,
+                best_streak: userProfile.best_streak
+              }));
+            }
+          } catch (error) {
+            console.error("Error refreshing profile after streak update:", error);
+          }
+        }
+      }
+    };
+    
+    handleDailyStreak();
+  }, []); // Make sure this runs only on mount
+
   // Save Motivation Callback
   const saveMotivation = useCallback(async () => {
     try {
