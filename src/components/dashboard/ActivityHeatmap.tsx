@@ -1,5 +1,5 @@
 // src/components/dashboard/ActivityHeatmap.tsx
-import { format, parseISO } from "date-fns";
+import { format, parseISO, startOfYear, endOfDay, eachDayOfInterval, isEqual } from "date-fns";
 import { es } from "date-fns/locale";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -29,7 +29,35 @@ interface ActivityHeatmapProps {
 }
 
 export function ActivityHeatmap({ activityData, isLoading = false }: ActivityHeatmapProps) {
-  // Render loading skeleton
+  // Generate an array of all days from the start of the year to today
+  const today = new Date();
+  const startDate = startOfYear(today);
+  const allDaysOfYear = eachDayOfInterval({ start: startDate, end: endOfDay(today) });
+
+  // Create a map of existing activity data for quick lookup
+  const activityMap = new Map();
+  activityData.forEach(day => {
+    activityMap.set(day.date, day);
+  });
+
+  // Create full activity data array with all days (with or without activity)
+  const fullActivityData = allDaysOfYear.map(date => {
+    const dateString = format(date, 'yyyy-MM-dd');
+    const existingData = activityMap.get(dateString);
+
+    if (existingData) {
+      return existingData;
+    } else {
+      // Return a default day object with no activity
+      return {
+        date: dateString,
+        total_minutes: 0,
+        sessions_count: 0,
+        user_id: activityData.length > 0 ? activityData[0].user_id : ''
+      };
+    }
+  });
+
   if (isLoading) {
     return (
       <Card className="bg-[#1a1a2e] border-gray-800">
@@ -75,7 +103,7 @@ export function ActivityHeatmap({ activityData, isLoading = false }: ActivityHea
         <TooltipProvider>
           <div className="py-2">
             <div className="grid grid-cols-52 gap-[2px]">
-              {activityData.map((day, index) => {
+              {fullActivityData.map((day, index) => {
                 const intensity = getActivityIntensity(day.total_minutes);
 
                 return (

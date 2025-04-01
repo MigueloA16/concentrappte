@@ -93,6 +93,7 @@ const getNextLevelInfo = (totalMinutes: number) => {
 interface DashboardClientProps {
   initialProfile: ProfileWithLevel;
   initialTodaySessions: FocusSession[];
+  initialAllSessions: FocusSession[];
   initialAchievements?: AchievementWithProgress[];
   initialActivityData?: DailyActivity[];
   periodStats?: {
@@ -108,6 +109,7 @@ interface DashboardClientProps {
 export default function DashboardClient({
   initialProfile,
   initialTodaySessions,
+  initialAllSessions = [],
   initialAchievements = [],
   initialActivityData = [],
   periodStats = { last7Days: 0, last30Days: 0 },
@@ -122,6 +124,7 @@ export default function DashboardClient({
     levelProgress: 0
   });
   const [todaySessions, setTodaySessions] = useState<FocusSession[]>(initialTodaySessions || []);
+  const [allSessions, setAllSessions] = useState<FocusSession[]>(initialAllSessions || []);
   const [achievements, setAchievements] = useState<AchievementWithProgress[]>(initialAchievements);
   const [activityData, setActivityData] = useState<DailyActivity[]>(initialActivityData);
 
@@ -282,10 +285,11 @@ export default function DashboardClient({
     try {
       setIsSessionsLoading(true);
 
+      // Fetch today's sessions
       const today = new Date();
       const todayISOString = today.toISOString().split('T')[0];
 
-      const { data, error } = await supabase
+      const { data: todayData, error: todayError } = await supabase
         .from("focus_sessions")
         .select(`
           *,
@@ -296,9 +300,23 @@ export default function DashboardClient({
         .lt("end_time", new Date(today.getTime() + 86400000).toISOString().split('T')[0])
         .order("end_time", { ascending: false });
 
-      if (error) throw error;
+      if (todayError) throw todayError;
+      setTodaySessions(todayData || []);
 
-      setTodaySessions(data || []);
+      // Fetch all sessions (limited to 100)
+      const { data: allData, error: allError } = await supabase
+        .from("focus_sessions")
+        .select(`
+          *,
+          task:task_id (id, name)
+        `)
+        .eq("user_id", profile?.id || '')
+        .order("end_time", { ascending: false })
+        .limit(100);
+
+      if (allError) throw allError;
+      setAllSessions(allData || []);
+
     } catch (error) {
       console.error("Error refreshing sessions:", error);
       toast.error("Error al actualizar sesiones");
@@ -630,9 +648,10 @@ export default function DashboardClient({
         <div className="h-full flex flex-col">
           <div className="flex-1 flex flex-col">
             <RecentSessions
-              sessions={todaySessions}
+              sessions={allSessions}
               isLoading={isSessionsLoading}
               onSessionUpdated={handleSessionsUpdated}
+              className="min-h-[500px]" // Add this prop to ensure same height
             />
           </div>
         </div>
@@ -643,6 +662,7 @@ export default function DashboardClient({
             <RecentAchievements
               achievements={achievements}
               isLoading={isAchievementsLoading}
+              className="min-h-[500px]" // Add this prop to ensure same height
             />
           </div>
         </div>

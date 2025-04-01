@@ -5,11 +5,11 @@ import { getUserProfile } from "@/app/auth-check";
 import DashboardClient from "@/components/dashboard/DashboardClient";
 
 // Import types directly from database.types
-import { 
-  ProfileWithLevel, 
-  FocusSession, 
-  AchievementWithProgress, 
-  DailyActivity 
+import {
+  ProfileWithLevel,
+  FocusSession,
+  AchievementWithProgress,
+  DailyActivity
 } from "@/lib/supabase/database.types";
 
 export const dynamic = 'force-dynamic';
@@ -37,6 +37,27 @@ async function fetchTodaySessions(userId: string): Promise<FocusSession[]> {
   }
 
   return todaySessions as FocusSession[];
+}
+
+async function fetchAllSessions(userId: string): Promise<FocusSession[]> {
+  const supabase = await createClient();
+
+  const { data: allSessions, error } = await supabase
+    .from("focus_sessions")
+    .select(`
+      *,
+      task:task_id (name)
+    `)
+    .eq("user_id", userId)
+    .order("end_time", { ascending: false })
+    .limit(100); // Limiting to the first 100 sessions
+
+  if (error) {
+    console.error("Error fetching all sessions:", error);
+    return [];
+  }
+
+  return allSessions as FocusSession[];
 }
 
 async function fetchAchievements(userId: string): Promise<AchievementWithProgress[]> {
@@ -87,7 +108,7 @@ async function fetchAchievements(userId: string): Promise<AchievementWithProgres
   // Combine achievements with user progress
   const achievementsWithProgress = allAchievements?.map(achievement => {
     const userProgress = userAchievementsMap.get(achievement.id);
-    
+
     return {
       ...achievement,
       progress: userProgress?.progress || 0,
@@ -123,7 +144,7 @@ async function fetchActivityData(userId: string): Promise<DailyActivity[]> {
 async function fetchSessionStats(userId: string) {
   const supabase = await createClient();
   const today = new Date();
-  
+
   const { data: totalStats } = await supabase.rpc('get_user_session_stats');
 
   const lastWeekDate = new Date(today);
@@ -140,9 +161,9 @@ async function fetchSessionStats(userId: string) {
 
   if (error) {
     console.error("Error fetching period sessions:", error);
-    return { 
-      totalStats: { count: 0, total_minutes: 0 }, 
-      periodStats: { last7Days: 0, last30Days: 0 } 
+    return {
+      totalStats: { count: 0, total_minutes: 0 },
+      periodStats: { last7Days: 0, last30Days: 0 }
     };
   }
 
@@ -153,16 +174,16 @@ async function fetchSessionStats(userId: string) {
   const last30Days = periodSessions?.reduce((sum, session) =>
     sum + (session.duration_minutes || 0), 0) || 0;
 
-  return { 
-    totalStats: totalStats[0] || { count: 0, total_minutes: 0 }, 
-    periodStats: { last7Days, last30Days } 
+  return {
+    totalStats: totalStats[0] || { count: 0, total_minutes: 0 },
+    periodStats: { last7Days, last30Days }
   };
 }
 
 export default async function DashboardPage() {
   // Get user profile and check authentication
   const profile = await getUserProfile();
-  
+
   if (!profile) {
     // Redirect or handle unauthenticated user
     return <div>Unauthorized</div>;
@@ -170,12 +191,14 @@ export default async function DashboardPage() {
 
   // Fetch data in parallel for better performance
   const [
-    todaySessions, 
-    achievements, 
-    activityData, 
+    todaySessions,
+    allSessions, // Add this new data fetching
+    achievements,
+    activityData,
     { totalStats, periodStats }
   ] = await Promise.all([
     fetchTodaySessions(profile.id),
+    fetchAllSessions(profile.id), // Add this new function call
     fetchAchievements(profile.id),
     fetchActivityData(profile.id),
     fetchSessionStats(profile.id)
@@ -186,6 +209,7 @@ export default async function DashboardPage() {
       <DashboardClient
         initialProfile={profile as ProfileWithLevel}
         initialTodaySessions={todaySessions}
+        initialAllSessions={allSessions} // Pass the new data to DashboardClient
         initialAchievements={achievements}
         initialActivityData={activityData}
         periodStats={periodStats}
